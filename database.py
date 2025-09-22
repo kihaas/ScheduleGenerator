@@ -1,7 +1,7 @@
 import sqlite3
 import json
-from typing import List
-from models import Subject, Lesson
+from typing import List, Dict, Set
+from models import Subject, Lesson, NegativeFilter
 
 
 class Database:
@@ -30,6 +30,14 @@ class Database:
                 time_slot INTEGER NOT NULL,
                 teacher TEXT NOT NULL,
                 subject_name TEXT NOT NULL
+            )
+        ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS negative_filters (
+                teacher TEXT PRIMARY KEY,
+                restricted_days TEXT,
+                restricted_slots TEXT
             )
         ''')
 
@@ -105,12 +113,52 @@ class Database:
         conn.close()
         return lessons
 
+    def save_negative_filters(self, negative_filters: Dict[str, NegativeFilter]):
+        conn = sqlite3.connect(self.db_name)
+        cursor = conn.cursor()
+
+        cursor.execute('DELETE FROM negative_filters')
+
+        for teacher, filter_data in negative_filters.items():
+            restricted_days = json.dumps(list(filter_data.restricted_days))
+            restricted_slots = json.dumps(list(filter_data.restricted_slots))
+
+            cursor.execute(
+                'INSERT INTO negative_filters (teacher, restricted_days, restricted_slots) VALUES (?, ?, ?)',
+                (teacher, restricted_days, restricted_slots)
+            )
+
+        conn.commit()
+        conn.close()
+
+    def get_negative_filters(self) -> Dict[str, NegativeFilter]:
+        conn = sqlite3.connect(self.db_name)
+        cursor = conn.cursor()
+
+        cursor.execute('SELECT teacher, restricted_days, restricted_slots FROM negative_filters')
+        rows = cursor.fetchall()
+
+        negative_filters = {}
+        for row in rows:
+            restricted_days = set(json.loads(row[1])) if row[1] else set()
+            restricted_slots = set(json.loads(row[2])) if row[2] else set()
+
+            negative_filters[row[0]] = NegativeFilter(
+                teacher=row[0],
+                restricted_days=restricted_days,
+                restricted_slots=restricted_slots
+            )
+
+        conn.close()
+        return negative_filters
+
     def clear_all(self):
         conn = sqlite3.connect(self.db_name)
         cursor = conn.cursor()
 
         cursor.execute('DELETE FROM subjects')
         cursor.execute('DELETE FROM lessons')
+        cursor.execute('DELETE FROM negative_filters')
 
         conn.commit()
         conn.close()

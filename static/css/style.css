@@ -4,269 +4,404 @@
     padding: 0;
 }
 
+:root {
+    --primary: #4f46e5;
+    --primary-hover: #4338ca;
+    --secondary: #64748b;
+    --success: #10b981;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --info: #3b82f6;
+    --light: #f8fafc;
+    --dark: #1e293b;
+    --border: #e2e8f0;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --radius: 12px;
+}
+
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    margin: 0;
-    padding: 20px;
-    background-color: #f8f9fa;
-    color: #333;
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+    color: var(--dark);
     line-height: 1.6;
+    min-height: 100vh;
+    padding: 20px;
 }
 
 .container {
-    display: flex;
-    flex-direction: column;
-    gap: 30px;
-    max-width: 1400px;
+    max-width: 1600px;
     margin: 0 auto;
 }
 
-
+header {
+    text-align: center;
+    background: linear-gradient(135deg, var(--primary) 0%, #7c3aed 100%);
+    color: white;
+    padding: 30px;
+    border-radius: var(--radius);
+    margin-bottom: 30px;
+    box-shadow: var(--shadow);
+}
 
 h1 {
+    font-size: 2.5rem;
     margin-bottom: 10px;
-    font-size: 2.2rem;
+    font-weight: 700;
+}
+
+header p {
+    font-size: 1.1rem;
+    opacity: 0.9;
 }
 
 .main-content {
-    display: flex;
+    display: grid;
+    grid-template-columns: 400px 1fr;
     gap: 30px;
+    align-items: start;
 }
 
-.input-section {
-    flex: 1;
+.control-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.content-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.card {
     background: white;
     padding: 25px;
-    border-radius: 10px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
 }
 
-.schedule-section {
-    flex: 2;
+.card h2 {
+    margin-bottom: 20px;
+    color: var(--dark);
+    font-size: 1.3rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.form-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
 }
 
 .input-group {
-    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
-label {
-    display: block;
-    margin-bottom: 8px;
+.input-group label {
     font-weight: 600;
-    color: #444;
+    color: var(--dark);
+    font-size: 0.9rem;
 }
 
 input, select {
-    width: 100%;
-    padding: 12px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    font-size: 16px;
-    transition: border-color 0.3s;
+    padding: 12px 16px;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    transition: all 0.3s ease;
 }
 
 input:focus, select:focus {
     outline: none;
-    border-color: #4CAF50;
-    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
 button {
-    background-color: #4CAF50;
-    color: white;
     padding: 12px 20px;
     border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 16px;
-    font-weight: 600;
-    transition: background-color 0.3s, transform 0.2s;
-    margin-right: 10px;
-    margin-bottom: 10px;
-}
-
-button:hover {
-    background-color: #45a049;
-    transform: translateY(-2px);
-}
-
-button:active {
-    transform: translateY(0);
-}
-
-button.secondary {
-    background-color: #f44336;
-}
-
-button.secondary:hover {
-    background-color: #d32f2f;
-}
-
-.buttons-container {
-    display: flex;
-    flex-wrap: wrap;
-    margin-top: 20px;
-}
-
-.schedule {
-    display: grid;
-    grid-template-columns: 100px repeat(7, 1fr);
-    gap: 2px;
-    background-color: #e0e0e0;
     border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-}
-
-.header, .time-slot, .day {
-    background-color: white;
-    padding: 15px;
-    text-align: center;
-}
-
-.header {
-    font-weight: bold;
-    background-color: #f0f0f0;
-    font-size: 16px;
-}
-
-.weekend {
-    background-color: #f5f5f5;
-    color: #999;
-}
-
-.time-slot {
     font-weight: 600;
-    background-color: #f9f9f9;
-}
-
-.lunch {
-    grid-column: 1 / span 8;
-    background-color: #fff3e0;
-    padding: 10px;
-    text-align: center;
-    font-style: italic;
-    color: #ff9800;
-    font-weight: 600;
-}
-
-.lesson {
-    background-color: #e8f5e9;
-    padding: 15px;
-    margin: 4px;
-    border-radius: 6px;
-    position: relative;
-    min-height: 90px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    transition: transform 0.2s;
-}
-
-.lesson:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-.delete-btn {
-    position: absolute;
-    top: 5px;
-    right: 5px;
     cursor: pointer;
-    color: #f44336;
-    font-weight: bold;
-    font-size: 18px;
-    background: none;
-    border: none;
+    transition: all 0.3s ease;
+    font-size: 14px;
 }
 
-.delete-btn:hover {
-    transform: scale(1.1);
+.btn-primary {
+    background: var(--primary);
+    color: white;
 }
 
-.past-lesson {
-    opacity: 0.7;
-    background-color: #eeeeee;
+.btn-primary:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
 }
 
-.hours-counter {
-    margin-top: 30px;
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+.btn-secondary {
+    background: var(--secondary);
+    color: white;
 }
 
-.subject-list {
-    margin-top: 15px;
+.btn-secondary:hover {
+    background: #475569;
+    transform: translateY(-1px);
+}
+
+.btn-success {
+    background: var(--success);
+    color: white;
+}
+
+.btn-success:hover {
+    background: #059669;
+    transform: translateY(-1px);
+}
+
+.btn-danger {
+    background: var(--danger);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
+    transform: translateY(-1px);
+}
+
+.btn-small {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+.checkbox-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+}
+
+.filters-list {
+    margin-top: 20px;
+    border-top: 1px solid var(--border);
+    padding-top: 20px;
+}
+
+.filters-list h3 {
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+}
+
+.filter-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    background: var(--light);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+}
+
+.buttons-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+
+.subjects-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
 
 .subject-item {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    padding: 12px;
-    margin-bottom: 10px;
-    background-color: #f9f9f9;
-    border-radius: 6px;
-    border-left: 4px solid #4CAF50;
+    gap: 15px;
+    padding: 15px;
+    background: var(--light);
+    border-radius: 8px;
+    border-left: 4px solid var(--primary);
 }
 
 .subject-info {
     flex: 1;
 }
 
-.subject-hours {
-    font-weight: bold;
-    margin-right: 15px;
-    color: #4CAF50;
+.subject-info strong {
+    display: block;
+    margin-bottom: 4px;
 }
 
-.remove-subject {
-    background-color: #ff5252;
+.teacher {
+    font-size: 0.9rem;
+    color: var(--secondary);
+}
+
+.hours-badge {
+    background: var(--primary);
     color: white;
-    border: none;
-    border-radius: 4px;
-    padding: 6px 12px;
-    cursor: pointer;
-    font-size: 14px;
+    padding: 4px 8px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
 }
 
-.remove-subject:hover {
-    background-color: #ff0000;
+.empty-state {
+    text-align: center;
+    color: var(--secondary);
+    padding: 30px;
+    font-style: italic;
+}
+
+/* Расписание */
+.schedule {
+    display: grid;
+    grid-template-columns: 120px repeat(7, 1fr);
+    gap: 2px;
+    background: var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.schedule-header {
+    background: var(--primary);
+    color: white;
+    padding: 15px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.time-slot {
+    background: var(--light);
+    padding: 15px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.day-cell {
+    background: white;
+    padding: 2px;
+    min-height: 100px;
+}
+
+.weekend {
+    background: #fef2f2;
+}
+
+.lesson-card {
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    padding: 12px;
+    border-radius: 6px;
+    height: 100%;
+    position: relative;
+    border-left: 4px solid var(--info);
+}
+
+.lesson-content {
+    margin-right: 20px;
+}
+
+.lesson-content strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 0.9rem;
+}
+
+.lesson-teacher {
+    font-size: 0.8rem;
+    color: var(--secondary);
+}
+
+.lesson-remove-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: none;
+    border: none;
+    color: var(--danger);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+}
+
+.lesson-remove-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.past-lesson {
+    background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
+    opacity: 0.7;
 }
 
 .empty-slot {
-    color: #999;
-    font-style: italic;
     display: flex;
     align-items: center;
     justify-content: center;
     height: 100%;
-    min-height: 90px;
+    color: var(--secondary);
+    font-style: italic;
+    font-size: 0.9rem;
 }
 
-@media (max-width: 1200px) {
+.lunch-break {
+    grid-column: 1 / span 8;
+    background: #fffbeb;
+    padding: 10px;
+    text-align: center;
+    color: var(--warning);
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+/* Адаптивность */
+@media (max-width: 1400px) {
     .main-content {
-        flex-direction: column;
+        grid-template-columns: 1fr;
+    }
+
+    .schedule {
+        grid-template-columns: 100px repeat(7, 1fr);
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
     }
 
     .schedule {
         grid-template-columns: 80px repeat(7, 1fr);
     }
-}
 
-@media (max-width: 768px) {
-    .schedule {
-        grid-template-columns: 60px repeat(7, 1fr);
-        font-size: 12px;
+    .schedule-header,
+    .time-slot {
+        padding: 8px;
+        font-size: 0.8rem;
     }
 
-    .header, .time-slot, .day {
-        padding: 8px;
-    }
-
-    .lesson {
-        padding: 8px;
-        min-height: 70px;
+    .checkbox-group {
+        grid-template-columns: 1fr;
     }
 
     .subject-item {
@@ -274,8 +409,500 @@ button.secondary:hover {
         align-items: flex-start;
         gap: 10px;
     }
+}
 
-    .subject-hours {
-        margin-right: 0;
+/* Анимации */
+.card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* Дополнительные стили для улучшенного интерфейса */
+
+/* Статистика */
+.stats-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    backdrop-filter: blur(10px);
+}
+
+.stat-number {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    opacity: 0.9;
+}
+
+/* Чекбоксы в сетке */
+.checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.day-badge, .slot-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    background: var(--light);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    min-width: 30px;
+    text-align: center;
+}
+
+/* Фильтры */
+.filter-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    background: var(--light);
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.filter-info {
+    flex: 1;
+}
+
+.filter-details {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-top: 5px;
+}
+
+.filter-tag {
+    font-size: 0.8rem;
+    padding: 4px 8px;
+    background: rgba(79, 70, 229, 0.1);
+    border-radius: 4px;
+    color: var(--primary);
+}
+
+/* Прогресс-бар */
+.progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 5px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--success);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.subject-item.completed {
+    opacity: 0.7;
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+}
+
+/* Заголовок расписания */
+.schedule-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.schedule-legend {
+    display: flex;
+    gap: 15px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+}
+
+.legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+}
+
+.legend-color.current {
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+}
+
+.legend-color.past {
+    background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
+}
+
+/* Улучшенное расписание */
+.schedule-container {
+    overflow-x: auto;
+}
+
+.schedule {
+    display: grid;
+    grid-template-columns: 80px repeat(7, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-radius: 8px;
+    min-width: 1000px;
+}
+
+.schedule-corner {
+    background: var(--primary);
+    color: white;
+    padding: 15px;
+    text-align: center;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.schedule-day-header {
+    background: var(--primary);
+    color: white;
+    padding: 15px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.schedule-day-header.weekend {
+    background: #dc2626;
+}
+
+.schedule-time-slot {
+    background: var(--light);
+    padding: 12px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.8rem;
+    position: relative;
+}
+
+.time-slot-number {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: var(--primary);
+    color: white;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.schedule-cell {
+    background: white;
+    padding: 2px;
+    min-height: 100px;
+    position: relative;
+}
+
+.schedule-cell.weekend {
+    background: #fef2f2;
+}
+
+.schedule-cell.past {
+    opacity: 0.7;
+}
+
+/* Улучшенные карточки пар */
+.lesson-card {
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    padding: 12px;
+    border-radius: 6px;
+    height: 100%;
+    position: relative;
+    border-left: 4px solid var(--info);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.lesson-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.lesson-content {
+    margin-right: 25px;
+}
+
+.lesson-content strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 0.9rem;
+    color: var(--dark);
+}
+
+.lesson-teacher {
+    font-size: 0.8rem;
+    color: var(--secondary);
+    margin-bottom: 4px;
+}
+
+.lesson-time {
+    font-size: 0.7rem;
+    color: var(--secondary);
+    opacity: 0.8;
+}
+
+.lesson-remove-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(239, 68, 68, 0.1);
+    border: none;
+    color: var(--danger);
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.lesson-remove-btn:hover {
+    background: var(--danger);
+    color: white;
+}
+
+.lesson-past-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: var(--success);
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+}
+
+.empty-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--secondary);
+    font-style: italic;
+    font-size: 0.8rem;
+    opacity: 0.6;
+}
+
+.empty-slot i {
+    font-size: 1.2rem;
+    margin-bottom: 5px;
+}
+
+.lunch-break {
+    grid-column: 1 / span 8;
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    padding: 12px;
+    text-align: center;
+    color: #d97706;
+    font-weight: 600;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+/* Модальное окно */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+    background-color: white;
+    margin: 15% auto;
+    padding: 25px;
+    border-radius: var(--radius);
+    width: 90%;
+    max-width: 500px;
+    position: relative;
+    box-shadow: var(--shadow);
+}
+
+.close {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    color: var(--secondary);
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close:hover {
+    color: var(--dark);
+}
+
+/* Анимации */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.card {
+    animation: fadeIn 0.5s ease-out;
+}
+
+.subject-item {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Адаптивность для мобильных */
+@media (max-width: 1024px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
     }
+
+    .schedule-header-row {
+        flex-direction: column;
+        gap: 15px;
+        align-items: flex-start;
+    }
+
+    .schedule-legend {
+        flex-wrap: wrap;
+    }
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .control-panel {
+        order: 2;
+    }
+
+    .content-panel {
+        order: 1;
+    }
+
+    .schedule {
+        grid-template-columns: 60px repeat(7, 1fr);
+        font-size: 0.7rem;
+    }
+
+    .schedule-day-header,
+    .schedule-time-slot {
+        padding: 8px;
+        font-size: 0.7rem;
+    }
+
+    .lesson-content strong {
+        font-size: 0.8rem;
+    }
+}
+
+/* Темная тема поддержка */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --light: #1e293b;
+        --dark: #f8fafc;
+        --border: #334155;
+    }
+
+    body {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        color: var(--dark);
+    }
+
+    .card {
+        background: #1e293b;
+        border-color: #334155;
+    }
+
+    input, select {
+        background: #334155;
+        border-color: #475569;
+        color: white;
+    }
+
+    .subject-item {
+        background: #334155;
+    }
+
+    .empty-slot {
+        color: #94a3b8;
+    }
+}
+
+/* Плавные переходы */
+* {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Улучшенная доступность */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+/* Кастомный скроллбар */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--light);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--secondary);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--primary);
 }

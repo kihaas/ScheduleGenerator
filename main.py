@@ -2,11 +2,11 @@ from fastapi import FastAPI, Request, Form, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
-from typing import List, Optional
+from typing import List, Dict, Set
 
-from models import Subject, Lesson
+from models import Subject, Lesson, NegativeFilter
 from database import Database
-from utils import generate_schedule, check_past_lessons, get_week_days, get_time_slots
+from utils import generate_schedule, check_past_lessons, get_week_days, get_time_slots, get_day_name, get_time_slot_name
 
 app = FastAPI(title="Генератор расписания")
 
@@ -20,9 +20,9 @@ db = Database()
 async def read_root(request: Request):
     subjects = db.get_subjects()
     lessons = db.get_lessons()
+    negative_filters = db.get_negative_filters()
     lessons_with_past = check_past_lessons(lessons)
 
-    # Создаем матрицу расписания для отображения в таблице
     schedule_matrix = create_schedule_matrix(lessons_with_past)
 
     return templates.TemplateResponse(
@@ -30,17 +30,19 @@ async def read_root(request: Request):
         {
             "request": request,
             "subjects": subjects,
+            "negative_filters": negative_filters,
             "schedule_matrix": schedule_matrix,
             "week_days": get_week_days(),
             "time_slots": get_time_slots(),
             "total_days": 7,
-            "total_time_slots": 4
+            "total_time_slots": 4,
+            "get_day_name": get_day_name,
+            "get_time_slot_name": get_time_slot_name
         }
     )
 
 
-def create_schedule_matrix(lessons: List[Lesson]) -> List[List[Optional[Lesson]]]:
-    # Создаем матрицу 7x4 (дни x пары)
+def create_schedule_matrix(lessons: List[Lesson]) -> List[List[Lesson]]:
     matrix = [[None for _ in range(4)] for _ in range(7)]
 
     for lesson in lessons:
@@ -59,7 +61,6 @@ async def add_subject(
 ):
     subjects = db.get_subjects()
 
-    # Проверяем, существует ли уже такой предмет
     existing_index = -1
     for i, subject in enumerate(subjects):
         if subject.teacher == teacher and subject.subject_name == subject_name:
@@ -67,11 +68,9 @@ async def add_subject(
             break
 
     if existing_index >= 0:
-        # Обновляем существующий предмет
         subjects[existing_index].total_hours += hours
         subjects[existing_index].remaining_hours += hours
     else:
-        # Добавляем новый предмет
         new_subject = Subject(
             teacher=teacher,
             subject_name=subject_name,
@@ -98,13 +97,14 @@ async def remove_subject(subject_id: int):
 @app.post("/generate-schedule")
 async def generate_schedule_route():
     subjects = db.get_subjects()
+    negative_filters = db.get_negative_filters()
 
     if not subjects:
         raise HTTPException(status_code=400, detail="Добавьте хотя бы один предмет")
 
-    lessons = generate_schedule(subjects)
+    lessons = generate_schedule(subjects, negative_filters)
     db.save_lessons(lessons)
-    db.save_subjects(subjects)  # Сохраняем обновленные remaining_hours
+    db.save_subjects(subjects)
 
     return RedirectResponse(url="/", status_code=303)
 
@@ -114,7 +114,6 @@ async def remove_lesson(day: int = Form(...), time_slot: int = Form(...)):
     lessons = db.get_lessons()
     subjects = db.get_subjects()
 
-    # Находим удаляемое занятие
     lesson_to_remove = None
     new_lessons = []
 
@@ -125,7 +124,6 @@ async def remove_lesson(day: int = Form(...), time_slot: int = Form(...)):
             new_lessons.append(lesson)
 
     if lesson_to_remove:
-        # Возвращаем 2 часа предмету
         for subject in subjects:
             if (subject.teacher == lesson_to_remove.teacher and
                     subject.subject_name == lesson_to_remove.subject_name):
@@ -138,6 +136,37 @@ async def remove_lesson(day: int = Form(...), time_slot: int = Form(...)):
     return RedirectResponse(url="/", status_code=303)
 
 
+@app.post("/add-negative-filter")
+async def add_negative_filter(
+        teacher: str = Form(...),
+        restricted_days: List[int] = Form([]),
+        restricted_slots: List[int] = Form([])
+):
+    negative_filters = db.get_negative_filters()
+
+    negative_filter = NegativeFilter(
+        teacher=teacher,
+        restricted_days=set(restricted_days),
+        restricted_slots=set(restricted_slots)
+    )
+
+    negative_filters[teacher] = negative_filter
+    db.save_negative_filters(negative_filters)
+
+    return RedirectResponse(url="/", status_code=303)
+
+
+@app.post("/remove-negative-filter/{teacher}")
+async def remove_negative_filter(teacher: str):
+    negative_filters = db.get_negative_filters()
+
+    if teacher in negative_filters:
+        del negative_filters[teacher]
+        db.save_negative_filters(negative_filters)
+
+    return RedirectResponse(url="/", status_code=303)
+
+
 @app.post("/clear-all")
 async def clear_all():
     db.clear_all()
@@ -146,5 +175,4 @@ async def clear_all():
 
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run(app, host="0.0.0.0", port=8000)

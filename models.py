@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Set
 from datetime import datetime
 
 class Subject(BaseModel):
@@ -16,6 +16,12 @@ class Lesson(BaseModel):
     subject_name: str
     is_past: bool = False
 
+class NegativeFilter(BaseModel):
+    teacher: str
+    restricted_days: Set[int] = set()  # Дни, когда нельзя ставить (0-6)
+    restricted_slots: Set[int] = set()  # Пары, когда нельзя ставить (0-3)
+
 class ScheduleData(BaseModel):
     subjects: List[Subject]
     lessons: List[Lesson]
+    negative_filters: Dict[str, NegativeFilter] = {}  # key: teacher name

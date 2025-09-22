@@ -5,108 +5,383 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Генератор расписания занятий</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
+    <div class="container">
+        <header>
+            <h1>🎓 Генератор расписания занятий</h1>
+            <p>Создайте идеальное расписание с учетом всех ограничений</p>
+        </header>
 
         <div class="main-content">
-            <div class="input-section">
-                <h2>Добавление предметов</h2>
-
-                <form method="post" action="/add-subject">
-                    <div class="input-group">
-                        <label for="teacher">Преподаватель:</label>
-                        <input type="text" id="teacher" name="teacher" placeholder="ФИО преподавателя" required>
-                    </div>
-
-                    <div class="input-group">
-                        <label for="subject_name">Предмет:</label>
-                        <input type="text" id="subject_name" name="subject_name" placeholder="Название предмета" required>
-                    </div>
-
-                    <div class="input-group">
-                        <label for="hours">Количество часов:</label>
-                        <input type="number" id="hours" name="hours" min="2" value="4" step="2" required>
-                    </div>
-
-                    <button type="submit">Добавить предмет</button>
-                </form>
-
-                <div class="hours-counter">
-                    <h3>Добавленные предметы</h3>
-                    <div class="subject-list">
-                        {% if subjects %}
-                            {% for subject in subjects %}
-                                <div class="subject-item">
-                                    <div class="subject-info">
-                                        <strong>{{ subject.subject_name }}</strong> - {{ subject.teacher }}
-                                    </div>
-                                    <div class="subject-hours">{{ subject.remaining_hours }}ч / {{ subject.total_hours }}ч</div>
-                                    <form method="post" action="/remove-subject/{{ loop.index0 }}" style="display: inline;">
-                                        <button type="submit" class="remove-subject">Удалить</button>
-                                    </form>
-                                </div>
-                            {% endfor %}
-                        {% else %}
-                            <p>Нет добавленных предметов</p>
-                        {% endif %}
+            <!-- Левая панель - управление -->
+            <div class="control-panel">
+                <!-- Статистика -->
+                <div class="card stats-card">
+                    <h2><i class="fas fa-chart-pie"></i> Статистика</h2>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-number">{{ subjects|length }}</div>
+                            <div class="stat-label">Предметов</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">{{ subjects|sum(attribute='total_hours') }}</div>
+                            <div class="stat-label">Всего часов</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-number">{{ subjects|sum(attribute='remaining_hours') }}</div>
+                            <div class="stat-label">Осталось часов</div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="buttons-container">
-                    <form method="post" action="/generate-schedule">
-                        <button type="submit">Сгенерировать расписание</button>
+                <!-- Добавление предметов -->
+                <div class="card">
+                    <h2><i class="fas fa-book"></i> Добавление предметов</h2>
+                    <form method="post" action="/add-subject" class="form-grid">
+                        <div class="input-group">
+                            <label for="teacher"><i class="fas fa-user-tie"></i> Преподаватель:</label>
+                            <input type="text" id="teacher" name="teacher" placeholder="ФИО преподавателя" required>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="subject_name"><i class="fas fa-graduation-cap"></i> Предмет:</label>
+                            <input type="text" id="subject_name" name="subject_name" placeholder="Название предмета" required>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="hours"><i class="fas fa-clock"></i> Часы (кратно 2):</label>
+                            <input type="number" id="hours" name="hours" min="2" value="4" step="2" required>
+                        </div>
+
+                        <button type="submit" class="btn-primary">
+                            <i class="fas fa-plus"></i> Добавить предмет
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Негативные фильтры -->
+                <div class="card">
+                    <h2><i class="fas fa-ban"></i> Ограничения</h2>
+                    <form method="post" action="/add-negative-filter" class="form-grid">
+                        <div class="input-group">
+                            <label for="filter_teacher"><i class="fas fa-user-tie"></i> Преподаватель:</label>
+                            <select id="filter_teacher" name="teacher" required>
+                                <option value="">Выберите преподавателя</option>
+                                {% for subject in subjects %}
+                                <option value="{{ subject.teacher }}">{{ subject.teacher }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="input-group">
+                            <label><i class="fas fa-calendar-times"></i> Запрещенные дни:</label>
+                            <div class="checkbox-grid">
+                                {% for day in week_days[:5] %}
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="restricted_days" value="{{ loop.index0 }}">
+                                    <span class="day-badge">{{ day[:2] }}</span>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="input-group">
+                            <label><i class="fas fa-clock"></i> Запрещенные пары:</label>
+                            <div class="checkbox-grid">
+                                {% for time_slot in time_slots %}
+                                <label class="checkbox-label">
+                                    <input type="checkbox" name="restricted_slots" value="{{ loop.index0 }}">
+                                    <span class="slot-badge">{{ loop.index0 + 1 }}</span>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn-secondary">
+                            <i class="fas fa-save"></i> Сохранить ограничения
+                        </button>
                     </form>
 
-                    <form method="post" action="/clear-all">
-                        <button type="submit" class="secondary">Очистить всё</button>
-                    </form>
+                    <div class="filters-list">
+                        <h3><i class="fas fa-list"></i> Текущие ограничения:</h3>
+                        {% for teacher, filter in negative_filters.items() %}
+                        <div class="filter-item">
+                            <div class="filter-info">
+                                <strong>{{ teacher }}</strong>
+                                <div class="filter-details">
+                                    {% if filter.restricted_days %}
+                                    <span class="filter-tag">
+                                        <i class="fas fa-calendar"></i>
+                                        Дни: {{ filter.restricted_days | join(', ') }}
+                                    </span>
+                                    {% endif %}
+                                    {% if filter.restricted_slots %}
+                                    <span class="filter-tag">
+                                        <i class="fas fa-clock"></i>
+                                        Пары: {{ filter.restricted_slots | join(', ') }}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <form method="post" action="/remove-negative-filter/{{ teacher }}">
+                                <button type="submit" class="btn-small btn-danger"
+                                        onclick="return confirm('Удалить ограничения для {{ teacher }}?')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                        {% else %}
+                        <p class="empty-state">Нет установленных ограничений</p>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Управление -->
+                <div class="card">
+                    <h2><i class="fas fa-cog"></i> Управление</h2>
+                    <div class="buttons-grid">
+                        <form method="post" action="/generate-schedule">
+                            <button type="submit" class="btn-success">
+                                <i class="fas fa-magic"></i> Сгенерировать расписание
+                            </button>
+                        </form>
+
+                        <form method="post" action="/clear-all">
+                            <button type="submit" class="btn-danger"
+                                    onclick="return confirm('Внимание! Это действие удалит все данные. Продолжить?')">
+                                <i class="fas fa-trash"></i> Очистить всё
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
 
-            <div class="schedule-section">
-                <h2>Расписание на неделю</h2>
-                <div class="schedule">
-                    <div class="header">Время</div>
+            <!-- Правая панель - предметы и расписание -->
+            <div class="content-panel">
+                <!-- Список предметов -->
+                <div class="card">
+                    <h2><i class="fas fa-list-alt"></i> Добавленные предметы</h2>
+                    <div class="subjects-list">
+                        {% if subjects %}
+                            {% for subject in subjects %}
+                            <div class="subject-item {% if subject.remaining_hours == 0 %}completed{% endif %}">
+                                <div class="subject-info">
+                                    <strong>{{ subject.subject_name }}</strong>
+                                    <span class="teacher">{{ subject.teacher }}</span>
+                                </div>
+                                <div class="subject-hours">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill"
+                                             style="width: {{ (subject.remaining_hours / subject.total_hours * 100) if subject.total_hours > 0 else 0 }}%">
+                                        </div>
+                                    </div>
+                                    <span class="hours-badge">{{ subject.remaining_hours }}/{{ subject.total_hours }}ч</span>
+                                </div>
+                                <form method="post" action="/remove-subject/{{ loop.index0 }}">
+                                    <button type="submit" class="btn-small btn-danger"
+                                            onclick="return confirm('Удалить предмет \"{{ subject.subject_name }}\"?')">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </form>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="empty-state">
+                                <i class="fas fa-inbox"></i><br>
+                                Нет добавленных предметов
+                            </p>
+                        {% endif %}
+                    </div>
+                </div>
 
-                    {% for day in week_days %}
-                        <div class="header {% if day in ['Суббота', 'Воскресенье'] %}weekend{% endif %}">
-                            {{ day }}
+                <!-- Расписание -->
+                <div class="card">
+                    <div class="schedule-header-row">
+                        <h2><i class="fas fa-calendar-alt"></i> Расписание на неделю</h2>
+                        <div class="schedule-legend">
+                            <div class="legend-item">
+                                <div class="legend-color current"></div>
+                                <span>Текущие пары</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color past"></div>
+                                <span>Прошедшие пары</span>
+                            </div>
                         </div>
-                    {% endfor %}
+                    </div>
 
-                    {% for time_slot in time_slots %}
-                        <div class="time-slot">
-                            {{ time_slot.start }}<br>{{ time_slot.end }}
-                        </div>
+                    <div class="schedule-container">
+                        <div class="schedule">
+                            <div class="schedule-corner">
+                                <i class="fas fa-clock"></i>
+                            </div>
 
-                        {% for day in range(total_days) %}
-                            <div class="day {% if day >= 5 %}weekend{% endif %}" id="cell-{{ day }}-{{ loop.index0 }}">
+                            {% for day in week_days %}
+                            <div class="schedule-day-header {% if day in ['Суббота', 'Воскресенье'] %}weekend{% endif %}">
+                                {{ day }}<br>
+                                <small>{{ ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][loop.index0] }}</small>
+                            </div>
+                            {% endfor %}
+
+                            {% for time_slot in time_slots %}
+                            <div class="schedule-time-slot">
+                                {{ time_slot.start }}<br>{{ time_slot.end }}
+                                <div class="time-slot-number">{{ loop.index0 + 1 }}</div>
+                            </div>
+
+                            {% for day in range(total_days) %}
+                            <div class="schedule-cell {% if day >= 5 %}weekend{% endif %}
+                                {% if schedule_matrix[day][loop.index0] and schedule_matrix[day][loop.index0].is_past %}past{% endif %}">
+
                                 {% if schedule_matrix[day][loop.index0] %}
                                     {% set lesson = schedule_matrix[day][loop.index0] %}
-                                    <div class="lesson {% if lesson.is_past %}past-lesson{% endif %}">
-                                        <strong>{{ lesson.subject_name }}</strong><br>
-                                        <em>{{ lesson.teacher }}</em>
+                                    <div class="lesson-card">
+                                        <div class="lesson-content">
+                                            <strong>{{ lesson.subject_name }}</strong>
+                                            <div class="lesson-teacher">{{ lesson.teacher }}</div>
+                                            <div class="lesson-time">{{ time_slot.start }}-{{ time_slot.end }}</div>
+                                        </div>
                                         {% if not lesson.is_past %}
-                                            <form method="post" action="/remove-lesson" style="position: absolute; top: 5px; right: 5px;">
-                                                <input type="hidden" name="day" value="{{ day }}">
-                                                <input type="hidden" name="time_slot" value="{{ loop.index0 }}">
-                                                <button type="submit" class="delete-btn" style="background: none; border: none; cursor: pointer; color: #f44336; font-weight: bold; font-size: 18px;">✕</button>
-                                            </form>
+                                        <form method="post" action="/remove-lesson">
+                                            <input type="hidden" name="day" value="{{ day }}">
+                                            <input type="hidden" name="time_slot" value="{{ loop.index0 }}">
+                                            <button type="submit" class="lesson-remove-btn"
+                                                    title="Удалить пару" onclick="return confirm('Удалить эту пару?')">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </form>
+                                        {% else %}
+                                        <div class="lesson-past-badge">
+                                            <i class="fas fa-check"></i>
+                                        </div>
                                         {% endif %}
                                     </div>
                                 {% else %}
-                                    <div class="empty-slot">Свободно</div>
+                                    <div class="empty-slot">
+                                        <i class="fas fa-plus"></i>
+                                        <span>Свободно</span>
+                                    </div>
                                 {% endif %}
                             </div>
-                        {% endfor %}
+                            {% endfor %}
 
-                        {% if loop.index0 == 1 %}
-                            <div class="lunch">Обеденный перерыв</div>
-                        {% endif %}
-                    {% endfor %}
+                            {% if loop.index0 == 1 %}
+                            <div class="lunch-break">
+                                <i class="fas fa-utensils"></i>
+                                Обеденный перерыв
+                            </div>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Модальное окно для быстрого просмотра -->
+    <div class="modal" id="lessonModal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Информация о паре</h3>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <script>
+        // Обновление списка преподавателей для фильтров
+        function updateTeacherSelect() {
+            const teacherSelect = document.getElementById('filter_teacher');
+            if (teacherSelect) {
+                const subjects = {{ subjects | tojson }};
+                const currentValue = teacherSelect.value;
+
+                teacherSelect.innerHTML = '<option value="">Выберите преподавателя</option>';
+
+                const uniqueTeachers = new Set();
+                subjects.forEach(subject => {
+                    uniqueTeachers.add(subject.teacher);
+                });
+
+                uniqueTeachers.forEach(teacher => {
+                    const option = document.createElement('option');
+                    option.value = teacher;
+                    option.textContent = teacher;
+                    if (teacher === currentValue) {
+                        option.selected = true;
+                    }
+                    teacherSelect.appendChild(option);
+                });
+            }
+        }
+
+        // Модальное окно
+        const modal = document.getElementById('lessonModal');
+        const closeBtn = document.querySelector('.close');
+
+        function showLessonInfo(lesson) {
+            document.getElementById('modalContent').innerHTML = `
+                <p><strong>Предмет:</strong> ${lesson.subject_name}</p>
+                <p><strong>Преподаватель:</strong> ${lesson.teacher}</p>
+                <p><strong>День:</strong> ${getDayName(lesson.day)}</p>
+                <p><strong>Время:</strong> ${getTimeSlotName(lesson.time_slot)}</p>
+                <p><strong>Статус:</strong> ${lesson.is_past ? 'Прошедшая' : 'Предстоящая'}</p>
+            `;
+            modal.style.display = 'block';
+        }
+
+        closeBtn.onclick = function() {
+            modal.style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Вспомогательные функции
+        function getDayName(dayIndex) {
+            const days = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+            return days[dayIndex] || '';
+        }
+
+        function getTimeSlotName(timeSlot) {
+            const slots = [
+                '9:00-10:30', '10:40-12:10', '12:40-14:10', '14:20-15:50'
+            ];
+            return slots[timeSlot] || '';
+        }
+
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', function() {
+            updateTeacherSelect();
+
+            // Обновляем каждые 30 секунд
+            setInterval(updateTeacherSelect, 30000);
+
+            // Добавляем обработчики для карточек пар
+            document.querySelectorAll('.lesson-card').forEach(card => {
+                card.addEventListener('click', function(e) {
+                    if (!e.target.closest('.lesson-remove-btn')) {
+                        const day = this.closest('.schedule-cell').dataset.day;
+                        const timeSlot = this.closest('.schedule-cell').dataset.timeSlot;
+                        // Здесь можно добавить логику для показа информации о паре
+                    }
+                });
+            });
+        });
+
+        // Автозаполнение преподавателей при вводе
+        document.getElementById('teacher').addEventListener('input', function() {
+            const input = this.value.toLowerCase();
+            const subjects = {{ subjects | tojson }};
+            const uniqueTeachers = new Set(subjects.map(s => s.teacher));
+
+            // Можно добавить подсказки или автозаполнение
+        });
+    </script>
 </body>
 </html>
