@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Генератор расписания занятий</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+        <div class="main-content">
+            <div class="input-section">
+                <h2>Добавление предметов</h2>
+
+                <form method="post" action="/add-subject">
+                    <div class="input-group">
+                        <label for="teacher">Преподаватель:</label>
+                        <input type="text" id="teacher" name="teacher" placeholder="ФИО преподавателя" required>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="subject_name">Предмет:</label>
+                        <input type="text" id="subject_name" name="subject_name" placeholder="Название предмета" required>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="hours">Количество часов:</label>
+                        <input type="number" id="hours" name="hours" min="2" value="4" step="2" required>
+                    </div>
+
+                    <button type="submit">Добавить предмет</button>
+                </form>
+
+                <div class="hours-counter">
+                    <h3>Добавленные предметы</h3>
+                    <div class="subject-list">
+                        {% if subjects %}
+                            {% for subject in subjects %}
+                                <div class="subject-item">
+                                    <div class="subject-info">
+                                        <strong>{{ subject.subject_name }}</strong> - {{ subject.teacher }}
+                                    </div>
+                                    <div class="subject-hours">{{ subject.remaining_hours }}ч / {{ subject.total_hours }}ч</div>
+                                    <form method="post" action="/remove-subject/{{ loop.index0 }}" style="display: inline;">
+                                        <button type="submit" class="remove-subject">Удалить</button>
+                                    </form>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <p>Нет добавленных предметов</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="buttons-container">
+                    <form method="post" action="/generate-schedule">
+                        <button type="submit">Сгенерировать расписание</button>
+                    </form>
+
+                    <form method="post" action="/clear-all">
+                        <button type="submit" class="secondary">Очистить всё</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="schedule-section">
+                <h2>Расписание на неделю</h2>
+                <div class="schedule">
+                    <div class="header">Время</div>
+
+                    {% for day in week_days %}
+                        <div class="header {% if day in ['Суббота', 'Воскресенье'] %}weekend{% endif %}">
+                            {{ day }}
+                        </div>
+                    {% endfor %}
+
+                    {% for time_slot in time_slots %}
+                        <div class="time-slot">
+                            {{ time_slot.start }}<br>{{ time_slot.end }}
+                        </div>
+
+                        {% for day in range(total_days) %}
+                            <div class="day {% if day >= 5 %}weekend{% endif %}" id="cell-{{ day }}-{{ loop.index0 }}">
+                                {% if schedule_matrix[day][loop.index0] %}
+                                    {% set lesson = schedule_matrix[day][loop.index0] %}
+                                    <div class="lesson {% if lesson.is_past %}past-lesson{% endif %}">
+                                        <strong>{{ lesson.subject_name }}</strong><br>
+                                        <em>{{ lesson.teacher }}</em>
+                                        {% if not lesson.is_past %}
+                                            <form method="post" action="/remove-lesson" style="position: absolute; top: 5px; right: 5px;">
+                                                <input type="hidden" name="day" value="{{ day }}">
+                                                <input type="hidden" name="time_slot" value="{{ loop.index0 }}">
+                                                <button type="submit" class="delete-btn" style="background: none; border: none; cursor: pointer; color: #f44336; font-weight: bold; font-size: 18px;">✕</button>
+                                            </form>
+                                        {% endif %}
+                                    </div>
+                                {% else %}
+                                    <div class="empty-slot">Свободно</div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+
+                        {% if loop.index0 == 1 %}
+                            <div class="lunch">Обеденный перерыв</div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
