@@ -6,7 +6,7 @@ from fastapi.exception_handlers import http_exception_handler
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.db.database import database
-from app.api import api_router
+from app.api.routes import api_router
 from app.services.schedule_services import schedule_service
 from app.services.subject_services import subject_service
 
