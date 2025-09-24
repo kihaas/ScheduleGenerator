@@ -96,3 +96,4 @@ def get_time_slots():
         {'start': '12:40', 'end': '14:10'},
         {'start': '14:20', 'end': '15:50'}
     ]
+

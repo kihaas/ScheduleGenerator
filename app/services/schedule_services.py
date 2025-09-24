@@ -31,7 +31,11 @@ class ScheduleService:
 
     async def generate_schedule(self) -> List[Lesson]:
         subjects = await subject_service.get_all_subjects()
-        negative_filters = await subject_service.get_negative_filters()
+        negative_filters_raw = await subject_service.get_negative_filters()
+        negative_filters = {
+            teacher: nf.model_dump()
+            for teacher, nf in negative_filters_raw.items()
+        }
 
         if not subjects:
             return []
