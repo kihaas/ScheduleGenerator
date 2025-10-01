@@ -1,0 +1,79 @@
+/* app/static/css/responsive.css */
+
+@media (max-width: 1200px) {
+    .app-container {
+        grid-template-columns: 280px 1fr;
+    }
+}
+
+@media (max-width: 992px) {
+    .app-container {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        height: auto;
+    }
+
+    .sidebar {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .main-content {
+        padding: 15px;
+    }
+
+    .schedule-grid {
+        grid-template-columns: 80px repeat(7, 1fr);
+        font-size: 0.8rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .controls-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .controls-row input,
+    .controls-row button {
+        width: 100%;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .priority-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .priority-form input {
+        width: 100%;
+        margin: 5px 0;
+    }
+}
+
+/* Темная тема */
+[data-theme="dark"] {
+    .card, .schedule-container {
+        background: var(--light);
+        border-color: var(--border);
+    }
+
+    input, select {
+        background: #334155;
+        border-color: #475569;
+        color: white;
+    }
+
+    .lesson-card {
+        background: linear-gradient(135deg, #1e3a8a 0%, #334155 100%);
+    }
+
+    .empty-slot {
+        color: #94a3b8;
+    }
+}

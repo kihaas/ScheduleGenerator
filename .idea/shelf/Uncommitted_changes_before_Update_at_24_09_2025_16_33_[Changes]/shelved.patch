@@ -1,0 +1,6 @@
+diff --git a/templates/index.html b/app/templates/index.html
+rename from templates/index.html
+rename to app/templates/index.html
+diff --git a/static/css/style.css b/app/static/css/style.css
+rename from static/css/style.css
+rename to app/static/css/style.css

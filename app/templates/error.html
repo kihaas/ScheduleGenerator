@@ -1,11 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <title>Ошибка</title>
     <style>
-        body { font-family: Arial; max-width: 600px; margin: 100px auto; padding: 20px; }
-        .error { background: #fee; padding: 20px; border-radius: 5px; }
-        button { padding: 10px 20px; margin: 10px; }
+        body { font-family: system-ui; max-width: 600px; margin: 100px auto; padding: 20px; }
+        .error { background: #fee; padding: 20px; border-radius: 8px; }
+        button { padding: 10px 20px; margin: 10px; border: none; border-radius: 6px; cursor: pointer; }
+        .btn-primary { background: #4f46e5; color: white; }
+        .btn-secondary { background: #64748b; color: white; }
     </style>
 </head>
 <body>
@@ -13,7 +16,7 @@
     <div class="error">
         <p><strong>Сообщение:</strong> {{ error }}</p>
     </div>
-    <button onclick="location.reload()">Перезагрузить</button>
-    <button onclick="location.href='/'">На главную</button>
+    <button class="btn-primary" onclick="location.reload()">🔄 Перезагрузить</button>
+    <button class="btn-secondary" onclick="location.href='/'">🏠 На главную</button>
 </body>
 </html>

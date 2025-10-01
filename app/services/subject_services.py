@@ -1,3 +1,4 @@
+
 from typing import List, Optional
 from app.db.database import database
 from app.db.models import Subject, NegativeFilter
@@ -76,3 +77,4 @@ class SubjectService:
 
 
 subject_service = SubjectService()
+

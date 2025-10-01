@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="b70b64c6-b346-4a7e-aa4e-6b5bd79b4de8" name="Changes" comment="config and generation logic">
+      <change afterPath="$PROJECT_DIR$/.idea/ScheduleGenerator.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_24_09_2025_16_33_[Changes]/shelved.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_24_09_2025_16_33__Changes_.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Dockerfile" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/static/css/base.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/static/css/components.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/static/css/layout.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/static/css/responsive.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/static/css/schedule.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/static/js/main.js" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/utils/generator_v2.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docker-compose.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/api/routes/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/routes/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/api/routes/schedule.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/routes/schedule.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/api/routes/subjects.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/routes/subjects.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/db/database.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/db/database.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/db/models.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/db/models.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/services/schedule_services.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/schedule_services.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/services/subject_services.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/subject_services.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/templates/error.html" beforeDir="false" afterPath="$PROJECT_DIR$/app/templates/error.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/utils/schedule_generator.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/utils/schedule_generator.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="JavaScript File" />
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;kihaas&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/kihaas/ScheduleGenerator.git&quot;,
+    &quot;accountId&quot;: &quot;34d07502-1bb5-4e91-9293-0156f1ec0e3e&quot;
+  }
+}</component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 3
+}</component>
+  <component name="ProjectId" id="333uwm13HEiDIIm0JJkK7wAmD0F" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Python.main (1).executor&quot;: &quot;Run&quot;,
+    &quot;Python.main.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/vi/ScheduleGenerator&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  }
+}</component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\vi\ScheduleGenerator\app" />
+      <recent name="C:\Users\vi\ScheduleGenerator" />
+      <recent name="C:\Users\vi\ScheduleGenerator\app\db" />
+      <recent name="C:\Users\vi\ScheduleGenerator\app\api\routes" />
+      <recent name="C:\Users\vi\ScheduleGenerator\models" />
+    </key>
+  </component>
+  <component name="RunManager">
+    <configuration name="main" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="ScheduleGenerator" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/main.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Python.main" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-5c90d61e3bab-JavaScript-PY-242.23339.19" />
+        <option value="bundled-python-sdk-0029f7779945-399fe30bd8c1-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-242.23339.19" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="b70b64c6-b346-4a7e-aa4e-6b5bd79b4de8" name="Changes" comment="" />
+      <created>1758558317968</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1758558317968</updated>
+      <workItem from="1758558319006" duration="1099000" />
+      <workItem from="1758560229423" duration="414000" />
+      <workItem from="1758561226963" duration="763000" />
+      <workItem from="1758562010306" duration="2213000" />
+      <workItem from="1758565371521" duration="227000" />
+      <workItem from="1758565663547" duration="2065000" />
+      <workItem from="1758567782418" duration="725000" />
+      <workItem from="1758568522580" duration="30000" />
+      <workItem from="1758568564759" duration="402000" />
+      <workItem from="1758568979502" duration="63000" />
+      <workItem from="1758569091940" duration="490000" />
+      <workItem from="1758652884617" duration="4846000" />
+      <workItem from="1758715050265" duration="1507000" />
+      <workItem from="1758717322745" duration="564000" />
+      <workItem from="1758717899414" duration="16000" />
+      <workItem from="1758717920827" duration="40000" />
+      <workItem from="1758718185854" duration="924000" />
+      <workItem from="1758719328404" duration="11422000" />
+      <workItem from="1758741939654" duration="285000" />
+      <workItem from="1758742334487" duration="1028000" />
+      <workItem from="1758743537370" duration="611000" />
+      <workItem from="1758744177537" duration="421000" />
+      <workItem from="1758818683446" duration="409000" />
+      <workItem from="1758819141136" duration="1984000" />
+      <workItem from="1759000134187" duration="2900000" />
+      <workItem from="1759053476280" duration="2123000" />
+      <workItem from="1759064953282" duration="1095000" />
+      <workItem from="1759066254014" duration="138000" />
+      <workItem from="1759066584959" duration="531000" />
+      <workItem from="1759067147438" duration="2330000" />
+      <workItem from="1759080590163" duration="303000" />
+      <workItem from="1759081199392" duration="592000" />
+      <workItem from="1759169724341" duration="615000" />
+      <workItem from="1759242492930" duration="326000" />
+      <workItem from="1759327440895" duration="1861000" />
+    </task>
+    <task id="LOCAL-00001" summary="new interface and logic">
+      <option name="closed" value="true" />
+      <created>1758561287189</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1758561287189</updated>
+    </task>
+    <task id="LOCAL-00002" summary="baase">
+      <option name="closed" value="true" />
+      <created>1758717197522</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1758717197522</updated>
+    </task>
+    <task id="LOCAL-00003" summary="baase">
+      <option name="closed" value="true" />
+      <created>1758721462015</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1758721462015</updated>
+    </task>
+    <task id="LOCAL-00004" summary="routes">
+      <option name="closed" value="true" />
+      <created>1758721488020</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1758721488020</updated>
+    </task>
+    <task id="LOCAL-00005" summary="services">
+      <option name="closed" value="true" />
+      <created>1758721500697</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1758721500697</updated>
+    </task>
+    <task id="LOCAL-00006" summary="config and generation logic">
+      <option name="closed" value="true" />
+      <created>1758721523026</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1758721523026</updated>
+    </task>
+    <task id="LOCAL-00007" summary="config and generation logic">
+      <option name="closed" value="true" />
+      <created>1758721530160</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1758721530160</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="new interface and logic" />
+    <MESSAGE value="baase" />
+    <MESSAGE value="routes" />
+    <MESSAGE value="services" />
+    <MESSAGE value="config and generation logic" />
+    <option name="LAST_COMMIT_MESSAGE" value="config and generation logic" />
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/ScheduleGenerator$main__1_.coverage" NAME="main (1) Coverage Results" MODIFIED="1758565469198" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/app" />
+    <SUITE FILE_PATH="coverage/ScheduleGenerator$main.coverage" NAME="main Coverage Results" MODIFIED="1758742894201" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+  </component>
+</project>

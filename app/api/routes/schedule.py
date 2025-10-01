@@ -21,3 +21,4 @@ async def remove_lesson(day: int = Form(...), time_slot: int = Form(...)):
         return RedirectResponse(url="/", status_code=303)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
