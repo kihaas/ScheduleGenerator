@@ -1,22 +1,42 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Ошибка</title>
-    <style>
-        body { font-family: system-ui; max-width: 600px; margin: 100px auto; padding: 20px; }
-        .error { background: #fee; padding: 20px; border-radius: 8px; }
-        button { padding: 10px 20px; margin: 10px; border: none; border-radius: 6px; cursor: pointer; }
-        .btn-primary { background: #4f46e5; color: white; }
-        .btn-secondary { background: #64748b; color: white; }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ошибка - Генератор расписания</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <h1>⚠️ Ошибка</h1>
-    <div class="error">
-        <p><strong>Сообщение:</strong> {{ error }}</p>
+    <div class="container">
+        <header>
+            <h1>🎓 Генератор расписания занятий</h1>
+            <p>Произошла ошибка</p>
+        </header>
+
+        <div class="main-content">
+            <div class="card" style="max-width: 600px; margin: 0 auto; text-align: center;">
+                <h2 style="color: var(--danger);">
+                    <i class="fas fa-exclamation-triangle"></i> Ошибка
+                </h2>
+
+                <div style="padding: 20px; background: var(--light); border-radius: 8px; margin: 20px 0;">
+                    <p style="font-size: 1.1rem; margin-bottom: 10px;">{{ error }}</p>
+                    {% if detail %}
+                    <p style="color: var(--secondary); font-size: 0.9rem;">Детали: {{ detail }}</p>
+                    {% endif %}
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    <a href="/" class="btn-primary">
+                        <i class="fas fa-home"></i> На главную
+                    </a>
+                    <button onclick="location.reload()" class="btn-secondary">
+                        <i class="fas fa-redo"></i> Обновить
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
-    <button class="btn-primary" onclick="location.reload()">🔄 Перезагрузить</button>
-    <button class="btn-secondary" onclick="location.href='/'">🏠 На главную</button>
 </body>
 </html>

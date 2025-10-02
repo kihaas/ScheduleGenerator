@@ -179,9 +179,9 @@
                                     </div>
                                     <span class="hours-badge">{{ subject.remaining_hours }}/{{ subject.total_hours }}ч</span>
                                 </div>
-                                <form method="post" action="/remove-subject/{{ loop.index0 }}">
+                                <form method="post" action="/remove-subject/{{ subject.id }}">
                                     <button type="submit" class="btn-small btn-danger"
-                                            onclick="return confirm('Удалить предмет \"{{ subject.subject_name }}\"?')">
+                                            onclick="return confirm('Удалить предмет \"{{ subject.subject_name }}\" у преподавателя {{ subject.teacher }}?')">
                                         <i class="fas fa-times"></i>
                                     </button>
                                 </form>

@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 class Database:
-    def __init__(self, db_path: str = "schedulee.db"):
+    def __init__(self, db_path: str = "schedule.db"):  # ← исправил название на schedule.db
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(exist_ok=True)
 
@@ -58,16 +58,32 @@ class Database:
         """Инициализация базы данных"""
         conn = await self.get_connection()
         try:
-            # Таблица предметов
+            # СНАЧАЛА создаем таблицу преподавателей
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS teachers (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE,
+                    email TEXT,
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+
+            # ПОТОМ таблицу предметов с teacher_id
             await conn.execute('''
                 CREATE TABLE IF NOT EXISTS subjects (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    teacher TEXT NOT NULL,
+                    teacher TEXT NOT NULL,  -- сохраняем для обратной совместимости
+                    teacher_id INTEGER,     -- НОВОЕ: ссылка на teachers.id
                     subject_name TEXT NOT NULL,
                     total_hours INTEGER NOT NULL DEFAULT 0,
                     remaining_hours INTEGER NOT NULL DEFAULT 0,
+                    priority INTEGER DEFAULT 1,           -- НОВОЕ
+                    color TEXT DEFAULT '#3b82f6',         -- НОВОЕ  
+                    notes TEXT,                           -- НОВОЕ
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(teacher, subject_name)
+                    UNIQUE(teacher, subject_name),
+                    FOREIGN KEY (teacher_id) REFERENCES teachers (id)
                 )
             ''')
 
@@ -94,7 +110,43 @@ class Database:
                 )
             ''')
 
+            # Таблица настроек
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+
+            # Таблица заблокированных слотов
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS blocked_slots (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date TEXT NOT NULL,  -- YYYY-MM-DD
+                    slot INTEGER NOT NULL CHECK(slot >= 0 AND slot <= 3),
+                    reason TEXT,
+                    created_by TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(date, slot)
+                )
+            ''')
+
+            # Таблица снимков недель
+            await conn.execute('''
+                CREATE TABLE IF NOT EXISTS week_snapshots (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    week_start DATE NOT NULL,  -- начало недели
+                    snapshot_data TEXT NOT NULL,  -- JSON с занятиями
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+
             await conn.commit()
+            print("✅ Все таблицы созданы успешно")
+        except Exception as e:
+            print(f"❌ Ошибка создания таблиц: {e}")
+            raise
         finally:
             await conn.close()
 

@@ -96,3 +96,34 @@ def get_time_slots():
         {'start': '12:40', 'end': '14:10'},
         {'start': '14:20', 'end': '15:50'}
     ]
+
+
+async def generate_schedule(self) -> List[Lesson]:
+    max_attempts = 3
+    for attempt in range(max_attempts):
+        lessons = await self._generate_schedule_attempt()
+        if self._is_schedule_complete(lessons):
+            await self.save_lessons(lessons)
+            await self._update_subjects_hours(lessons)
+            return lessons
+
+    # Если не удалось распределить все, сохраняем частичное расписание
+    await self.save_lessons(lessons)
+    await self._update_subjects_hours(lessons)
+    return lessons
+
+
+def _is_schedule_complete(self, lessons: List[Lesson]) -> bool:
+    # Проверяем, что все часы распределены
+    assigned_hours = {}
+    for lesson in lessons:
+        key = (lesson.teacher, lesson.subject_name)
+        assigned_hours[key] = assigned_hours.get(key, 0) + 2
+
+    subjects_hours = {(s.teacher, s.subject_name): s.remaining_hours for s in self.subjects}
+
+    for key, required in subjects_hours.items():
+        assigned = assigned_hours.get(key, 0)
+        if assigned < required:
+            return False
+    return True

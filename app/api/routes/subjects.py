@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import RedirectResponse
 from app.services.subject_services import subject_service
