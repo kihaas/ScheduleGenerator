@@ -1,43 +1,111 @@
 import random
+from collections import defaultdict
 from typing import List, Dict, Set, Tuple
 from datetime import datetime
+
+from app.db import database
 from app.db.models import Subject, Lesson, NegativeFilter
+from app.services.subject_services import subject_service
 
 
-def generate_schedule(subjects: List[Subject], negative_filters: List[NegativeFilter]) -> List[Lesson]:
+async def generate_schedule(self) -> List[Lesson]:
+    subjects = await subject_service.get_all_subjects()  # предполагаем, что Subject теперь содержит remaining_pairs и optional priority/max_per_day
+    negative_filters_raw = await subject_service.get_negative_filters()
+    negative_filters = {
+        teacher: nf.model_dump()
+        for teacher, nf in negative_filters_raw.items()
+    }
+
     if not subjects:
         return []
 
+    # Подготовим mutable словарь предметов по ключу (teacher, subject_name)
+    # и локальные копии remaining_pairs / priority / max_per_day
+    subj_list = []
+    for s in subjects:
+        subj_list.append({
+            'teacher': s.teacher,
+            'subject_name': s.subject_name,
+            # Если у тебя ещё не migrated to pairs — используй remaining_hours // 2
+            'remaining_pairs': getattr(s, 'remaining_pairs', getattr(s, 'remaining_hours', 0) // 2),
+            'priority': getattr(s, 'priority', None),
+            'max_per_day': getattr(s, 'max_per_day', None)  # optional
+        })
+
+    # counters
+    teacher_slot_booked = set()  # (teacher, day, time_slot)
+    teacher_day_count = defaultdict(lambda: defaultdict(int))  # teacher_day_count[teacher][day] = number assigned that day
+    subject_day_count = defaultdict(lambda: defaultdict(int))  # subject_day_count[(teacher,subject)][day]
+
     lessons = []
-    subjects_copy = subjects.copy()
-    negative_filters_dict = {f.teacher: f for f in negative_filters}
 
-    # Create availability matrix
-    teacher_availability = [[set() for _ in range(4)] for _ in range(7)]
+    all_slots = [(day, ts) for day in range(5) for ts in range(4)]  # Пн-Пт, 4 пары
 
-    # Shuffle and sort subjects
-    random.shuffle(subjects_copy)
-    subjects_copy.sort(key=lambda x: (-x.remaining_hours, x.teacher))
+    for day, time_slot in all_slots:
+        # Собираем кандидатов
+        candidates = []
+        for s in subj_list:
+            if s['remaining_pairs'] <= 0:
+                continue
 
-    for subject in subjects_copy:
-        hours_to_assign = subject.remaining_hours
-        restrictions = negative_filters_dict.get(subject.teacher)
+            # проверки negative filters
+            nf = negative_filters.get(s['teacher'], {})
+            if day in nf.get('restricted_days', []):
+                continue
+            if time_slot in nf.get('restricted_slots', []):
+                continue
 
-        while hours_to_assign >= 2:
-            slot = find_available_slot(subject.teacher, teacher_availability, restrictions)
-            if not slot:
-                break
+            # преподаватель не занят в этот слот
+            if (s['teacher'], day, time_slot) in teacher_slot_booked:
+                continue
 
-            day, time_slot = slot
-            lessons.append(Lesson(
-                day=day,
-                time_slot=time_slot,
-                teacher=subject.teacher,
-                subject_name=subject.subject_name
-            ))
+            # лимит пар в день на преподавателя (если задан)
+            if s['max_per_day'] is not None and teacher_day_count[s['teacher']][day] >= s['max_per_day']:
+                continue
 
-            teacher_availability[day][time_slot].add(subject.teacher)
-            hours_to_assign -= 2
+            # доп. ограничение: не делать >2 одинаковых пар одного предмета в один день (настраиваемо)
+            if subject_day_count[(s['teacher'], s['subject_name'])][day] >= 2:
+                continue
+
+            candidates.append(s)
+
+        if not candidates:
+            # нет кандидатов для этого слота — пропустить (можно логировать)
+            continue
+
+        # веса: priority (если есть) иначе remaining_pairs
+        weights = []
+        for c in candidates:
+            w = c['priority'] if (c.get('priority') is not None) else max(1, c['remaining_pairs'])
+            weights.append(max(1, int(w)))
+
+        chosen = random.choices(candidates, weights=weights, k=1)[0]
+
+        # назначаем
+        lessons.append(Lesson(
+            day=day,
+            time_slot=time_slot,
+            teacher=chosen['teacher'],
+            subject_name=chosen['subject_name']
+        ))
+
+        # пометим занятие
+        teacher_slot_booked.add((chosen['teacher'], day, time_slot))
+        teacher_day_count[chosen['teacher']][day] += 1
+        subject_day_count[(chosen['teacher'], chosen['subject_name'])][day] += 1
+        chosen['remaining_pairs'] -= 1
+
+    # Сохраняем и обновляем часы
+    await self.save_lessons(lessons)
+
+    # Обновляем subjects в БД: запишем новые remaining_pairs
+    for s in subj_list:
+        # Записываем обратно в поле remaining_hours или remaining_pairs в БД
+        # Предполагается, что subject_service поддерживает обновление remaining_pairs:
+        await database.execute(
+            'UPDATE subjects SET remaining_pairs = ? WHERE teacher = ? AND subject_name = ?',
+            (s['remaining_pairs'], s['teacher'], s['subject_name'])
+        )
 
     return lessons
 
@@ -60,29 +128,6 @@ def find_available_slot(teacher: str, teacher_availability: List[List[Set[str]]]
     return random.choice(available_slots) if available_slots else None
 
 
-def check_past_lessons(lessons: List[Lesson]) -> List[Lesson]:
-    now = datetime.now()
-    current_day = now.weekday()
-    current_hour = now.hour
-    current_minute = now.minute
-
-    for lesson in lessons:
-        lesson.is_past = is_lesson_past(lesson.day, lesson.time_slot, current_day, current_hour, current_minute)
-
-    return lessons
-
-
-def is_lesson_past(lesson_day: int, time_slot: int, current_day: int, current_hour: int, current_minute: int) -> bool:
-    if lesson_day < current_day:
-        return True
-
-    if lesson_day == current_day:
-        end_times = [(10, 30), (12, 10), (14, 10), (15, 50)]
-        if time_slot < len(end_times):
-            end_hour, end_minute = end_times[time_slot]
-            return current_hour > end_hour or (current_hour == end_hour and current_minute > end_minute)
-
-    return False
 
 
 def get_week_days():

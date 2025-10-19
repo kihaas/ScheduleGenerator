@@ -1,62 +1,838 @@
-// app/static/js/main.js
+// Основной модуль приложения
+class ScheduleApp {
+    constructor() {
+        this.currentLesson = null;
+        this.teachers = [];
+        this.subjects = [];
+        this.lessons = [];
+        this.savedSchedules = [];
+        this.filters = [];
+        this.init();
+    }
 
-// Переключение темы
-function toggleTheme() {
-    const html = document.documentElement;
-    const current = html.getAttribute('data-theme') || 'light';
-    const next = current === 'light' ? 'dark' : 'light';
-    html.setAttribute('data-theme', next);
-    localStorage.setItem('theme', next);
+    async init() {
+        this.setupEventListeners();
+        this.setupThemeToggle();
+        await this.loadInitialData();
+        this.renderSchedule();
+        this.updateStatistics();
+    }
+
+    setupEventListeners() {
+        // Sidebar toggle
+        document.getElementById('sidebarToggle').addEventListener('click', () => {
+            document.querySelector('.sidebar').classList.toggle('active');
+        });
+
+        // Section headers
+                // Section headers
+        document.querySelectorAll('.nav-section-header').forEach(header => {
+            header.addEventListener('click', () => {
+                const section = header.parentElement;
+                section.classList.toggle('active');
+            });
+        });
+
+        // Forms
+        document.getElementById('addTeacherForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.addTeacher();
+        });
+
+        document.getElementById('addSubjectForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.addSubject();
+        });
+
+        document.getElementById('addFilterForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.addNegativeFilter();
+        });
+
+        document.getElementById('saveScheduleForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.saveSchedule();
+        });
+
+        // Buttons
+        document.getElementById('generateSchedule').addEventListener('click', () => {
+            this.generateSchedule();
+        });
+
+        document.getElementById('fullGenerate').addEventListener('click', () => {
+            this.generateSchedule();
+        });
+
+        document.getElementById('clearAll').addEventListener('click', () => {
+            this.clearAllData();
+        });
+
+        document.getElementById('refreshStats').addEventListener('click', () => {
+            this.updateStatistics();
+        });
+
+        // Context menu
+        document.addEventListener('contextmenu', (e) => {
+            if (e.target.closest('.schedule-cell') && e.target.closest('.lesson-card')) {
+                e.preventDefault();
+                this.showContextMenu(e);
+            }
+        });
+
+        document.addEventListener('click', () => {
+            this.hideContextMenu();
+        });
+
+        // Modal events
+        this.setupModalEvents();
+    }
+
+    setupModalEvents() {
+        const replaceModal = document.getElementById('replaceModal');
+        const closeBtn = replaceModal.querySelector('.close');
+        const cancelBtn = document.getElementById('cancelReplace');
+        const confirmBtn = document.getElementById('confirmReplace');
+
+        [closeBtn, cancelBtn].forEach(btn => {
+            btn.addEventListener('click', () => {
+                replaceModal.style.display = 'none';
+            });
+        });
+
+        confirmBtn.addEventListener('click', () => {
+            this.replaceLesson();
+        });
+
+        // Close modal on outside click
+        replaceModal.addEventListener('click', (e) => {
+            if (e.target === replaceModal) {
+                replaceModal.style.display = 'none';
+            }
+        });
+    }
+
+    setupThemeToggle() {
+        const themeToggle = document.getElementById('themeToggle');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+        // Устанавливаем начальную тему
+        if (prefersDark) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+        }
+
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            if (currentTheme === 'dark') {
+                document.documentElement.removeAttribute('data-theme');
+                themeToggle.innerHTML = '<i class="fas fa-moon"></i>';
+                localStorage.setItem('theme', 'light');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+                localStorage.setItem('theme', 'dark');
+            }
+        });
+
+        // Загружаем сохраненную тему
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+        }
+    }
+
+    async loadInitialData() {
+        try {
+            await Promise.all([
+                this.loadTeachers(),
+                this.loadSubjects(),
+                this.loadLessons(),
+                this.loadSavedSchedules(),
+                this.loadFilters()
+            ]);
+        } catch (error) {
+            this.showError('Ошибка загрузки данных: ' + error.message);
+        }
+    }
+
+    async loadTeachers() {
+        try {
+            const response = await fetch('/api/teachers');
+            if (response.ok) {
+                this.teachers = await response.json();
+                this.populateTeacherSelects();
+                this.renderTeachersList();
+            }
+        } catch (error) {
+            console.error('Error loading teachers:', error);
+        }
+    }
+
+    async loadSubjects() {
+        try {
+            const response = await fetch('/api/lessons');
+            if (response.ok) {
+                this.subjects = await response.json();
+                this.renderSubjectsList();
+            }
+        } catch (error) {
+            console.error('Error loading subjects:', error);
+        }
+    }
+
+    async loadLessons() {
+        try {
+            const response = await fetch('/api/lessons');
+            if (response.ok) {
+                this.lessons = await response.json();
+                this.renderSchedule();
+            }
+        } catch (error) {
+            console.error('Error loading lessons:', error);
+        }
+    }
+
+    async loadSavedSchedules() {
+        try {
+            const response = await fetch('/api/schedules');
+            if (response.ok) {
+                this.savedSchedules = await response.json();
+                this.renderSavedSchedulesList();
+            }
+        } catch (error) {
+            console.error('Error loading saved schedules:', error);
+        }
+    }
+
+    async loadFilters() {
+        try {
+            const response = await fetch('/api/lessons');
+            if (response.ok) {
+                // Загружаем фильтры из API если будет endpoint
+                this.renderFiltersList();
+            }
+        } catch (error) {
+            console.error('Error loading filters:', error);
+        }
+    }
+
+    populateTeacherSelects() {
+        const selects = document.querySelectorAll('select[name="teacher"], #teacherSelect, #filterTeacherSelect, #replaceTeacherSelect');
+        selects.forEach(select => {
+            select.innerHTML = '<option value="">Выберите преподавателя</option>';
+            this.teachers.forEach(teacher => {
+                const option = document.createElement('option');
+                option.value = teacher.name;
+                option.textContent = teacher.name;
+                select.appendChild(option);
+            });
+        });
+    }
+
+    renderTeachersList() {
+        const container = document.getElementById('teachersList');
+        if (!this.teachers.length) {
+            container.innerHTML = '<div class="empty-state">Нет преподавателей</div>';
+            return;
+        }
+
+        container.innerHTML = this.teachers.map(teacher => `
+            <div class="teacher-item" data-id="${teacher.id}">
+                <div class="teacher-info">
+                    <strong>${teacher.name}</strong>
+                </div>
+                <button class="btn-danger btn-small" onclick="app.deleteTeacher(${teacher.id})">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `).join('');
+    }
+
+    renderSubjectsList() {
+        const container = document.getElementById('subjectsList');
+        if (!this.subjects.length) {
+            container.innerHTML = '<div class="empty-state">Нет добавленных предметов</div>';
+            return;
+        }
+
+        container.innerHTML = this.subjects.map(subject => `
+            <div class="subject-item" data-id="${subject.id}">
+                <div class="subject-info">
+                    <strong>${subject.subject_name}</strong>
+                    <div class="teacher-name">${subject.teacher}</div>
+                </div>
+                <div class="hours-badge">${subject.remaining_pairs}п</div>
+                <button class="btn-danger btn-small" onclick="app.deleteSubject(${subject.id})">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `).join('');
+    }
+
+    renderSavedSchedulesList() {
+        const container = document.getElementById('savedSchedulesList');
+        if (!this.savedSchedules.length) {
+            container.innerHTML = '<div class="empty-state">Нет сохраненных расписаний</div>';
+            return;
+        }
+
+        container.innerHTML = this.savedSchedules.map(schedule => `
+            <div class="saved-schedule-item" data-id="${schedule.id}">
+                <div class="schedule-info">
+                    <strong>${schedule.name}</strong>
+                    <div class="schedule-meta">
+                        ${new Date(schedule.created_at).toLocaleDateString()} • 
+                        ${schedule.lesson_count} пар
+                    </div>
+                </div>
+                <div class="schedule-actions">
+                    <button class="btn-primary btn-small" onclick="app.loadSchedule(${schedule.id})">
+                        <i class="fas fa-download"></i>
+                    </button>
+                    <button class="btn-danger btn-small" onclick="app.deleteSchedule(${schedule.id})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    renderFiltersList() {
+        const container = document.getElementById('filtersList');
+        // Заглушка для фильтров
+        container.innerHTML = '<div class="empty-state">Ограничения появятся здесь после сохранения</div>';
+    }
+
+    renderSchedule() {
+        const scheduleGrid = document.getElementById('scheduleGrid');
+        const weekDays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+        const timeSlots = [
+            { start: '9:00', end: '10:30' },
+            { start: '10:40', end: '12:10' },
+            { start: '12:40', end: '14:10' },
+            { start: '14:20', end: '15:50' }
+        ];
+
+        let html = '';
+
+        // Header row
+        html += '<div class="schedule-header"></div>';
+        weekDays.forEach((day, index) => {
+            const isWeekend = index >= 5;
+            html += `<div class="schedule-header ${isWeekend ? 'weekend' : ''}">${day}<br><small>${['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][index]}</small></div>`;
+        });
+
+        // Time slots and lessons
+        timeSlots.forEach((slot, slotIndex) => {
+            html += `<div class="time-slot">${slot.start}<br>${slot.end}<div class="time-slot-number">${slotIndex + 1}</div></div>`;
+
+            for (let day = 0; day < 7; day++) {
+                const lesson = this.lessons.find(l => l.day === day && l.time_slot === slotIndex);
+                const isWeekend = day >= 5;
+
+                html += `<div class="schedule-cell ${isWeekend ? 'weekend' : ''}" data-day="${day}" data-slot="${slotIndex}">`;
+
+                if (lesson) {
+                    html += `
+                        <div class="lesson-card">
+                            <div class="lesson-content">
+                                <strong>${lesson.subject_name}</strong>
+                                <div class="lesson-teacher">${lesson.teacher}</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    html += `<div class="empty-slot"><i class="fas fa-plus"></i><span>Свободно</span></div>`;
+                }
+
+                html += '</div>';
+            }
+
+            // Lunch break after second slot
+            if (slotIndex === 1) {
+                html += `<div class="lunch-break" style="grid-column: 1 / span 8;">
+                    <i class="fas fa-utensils"></i> Обеденный перерыв
+                </div>`;
+            }
+        });
+
+        scheduleGrid.innerHTML = html;
+
+        // Add click handlers for lessons
+        scheduleGrid.querySelectorAll('.schedule-cell').forEach(cell => {
+            cell.addEventListener('click', (e) => {
+                if (e.target.closest('.lesson-card')) {
+                    this.handleLessonClick(cell);
+                }
+            });
+        });
+    }
+
+    handleLessonClick(cell) {
+        // Можно добавить функциональность при клике на пару
+        console.log('Lesson clicked:', cell.dataset.day, cell.dataset.slot);
+    }
+
+    showContextMenu(e) {
+        const contextMenu = document.getElementById('contextMenu');
+        const cell = e.target.closest('.schedule-cell');
+
+        this.currentLesson = {
+            day: parseInt(cell.dataset.day),
+            time_slot: parseInt(cell.dataset.slot)
+        };
+
+        contextMenu.style.display = 'block';
+        contextMenu.style.left = e.pageX + 'px';
+        contextMenu.style.top = e.pageY + 'px';
+
+        // Context menu actions
+        contextMenu.querySelectorAll('.context-item').forEach(item => {
+            item.onclick = () => {
+                const action = item.dataset.action;
+                this.handleContextAction(action);
+            };
+        });
+    }
+
+    hideContextMenu() {
+        document.getElementById('contextMenu').style.display = 'none';
+    }
+
+    handleContextAction(action) {
+        switch (action) {
+            case 'delete':
+                this.deleteLesson();
+                break;
+            case 'replace':
+                this.showReplaceModal();
+                break;
+        }
+        this.hideContextMenu();
+    }
+
+    async deleteLesson() {
+        if (!this.currentLesson) return;
+
+        if (!confirm('Удалить эту пару?')) return;
+
+        try {
+            const response = await fetch(`/api/lessons?day=${this.currentLesson.day}&time_slot=${this.currentLesson.time_slot}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                this.showSuccess('Пара удалена');
+                await this.loadLessons();
+                await this.updateStatistics();
+            } else {
+                throw new Error(await response.text());
+            }
+        } catch (error) {
+            this.showError('Ошибка удаления: ' + error.message);
+        }
+    }
+
+    showReplaceModal() {
+        const modal = document.getElementById('replaceModal');
+        document.getElementById('replaceDay').value = this.currentLesson.day;
+        document.getElementById('replaceTimeSlot').value = this.currentLesson.time_slot;
+        modal.style.display = 'block';
+    }
+
+    async replaceLesson() {
+        const form = document.getElementById('replaceForm');
+        const formData = new FormData(form);
+
+        const data = {
+            day: parseInt(formData.get('day')),
+            time_slot: parseInt(formData.get('time_slot')),
+            new_teacher: formData.get('new_teacher'),
+            new_subject_name: formData.get('new_subject_name')
+        };
+
+        try {
+            const response = await fetch('/api/lessons', {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                this.showSuccess('Пара заменена');
+                document.getElementById('replaceModal').style.display = 'none';
+                form.reset();
+                await this.loadLessons();
+                await this.updateStatistics();
+            } else {
+                throw new Error(await response.text());
+            }
+        } catch (error) {
+            this.showError('Ошибка замены: ' + error.message);
+        }
+    }
+
+    async addTeacher() {
+        const form = document.getElementById('addTeacherForm');
+        const formData = new FormData(form);
+        const name = formData.get('name');
+
+        try {
+            const response = await fetch('/api/teachers', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ name })
+            });
+
+            if (response.ok) {
+                this.showSuccess('Преподаватель добавлен');
+                form.reset();
+                await this.loadTeachers();
+                await this.updateStatistics();
+            } else {
+                throw new Error(await response.text());
+            }
+        } catch (error) {
+            this.showError('Ошибка добавления преподавателя: ' + error.message);
+        }
+    }
+
+    async deleteTeacher(teacherId) {
+        if (!confirm('Удалить этого преподавателя?')) return;
+
+        try {
+            const response = await fetch(`/api/teachers/${teacherId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                this.showSuccess('Преподаватель удален');
+                await this.loadTeachers();
+                await this.updateStatistics();
+            } else {
+                throw new Error(await response.text());
+            }
+        } catch (error) {
+            this.showError('Ошибка удаления преподавателя: ' + error.message);
+        }
+    }
+
+    async addSubject() {
+        const form = document.getElementById('addSubjectForm');
+        const formData = new FormData(form);
+
+        const data = {
+            teacher: formData.get('teacher'),
+            subject_name: formData.get('subject_name'),
+            hours: parseInt(formData.get('hours')),
+            priority: parseInt(formData.get('priority')) || 0,
+            max_per_day: parseInt(formData.get('max_per_day')) || 2
+        };
+
+        try {
+            const response = await fetch('/add-subject', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams(data)
+            });
+
+            if (response.ok) {
+                this.showSuccess('Предмет добавлен');
+                form.reset();
+                await this.loadSubjects();
+                await this.updateStatistics();
+            } else {
+                throw new Error(await response.text());
+            }
+        } catch (error) {
+            this.showError('Ошибка добавления предмета: ' + error.message);
+        }
+    }
+
+    async deleteSubject(subjectId) {
+        if (!confirm('Удалить этот предмет?')) return;
+
+        try {
+            const response = await fetch(`/remove-subject/${subjectId}`, {
+                method: 'POST'
+            });
+
+            if (response.ok) {
+                this.showSuccess('Предмет удален');
+                await this.loadSubjects();
+                await this.updateStatistics();
+            } else {
+                throw new Error(await response.text());
+            }
+        } catch (error) {
+            this.showError('Ошибка удаления предмета: ' + error.message);
+        }
+    }
+
+    async addNegativeFilter() {
+        const form = document.getElementById('addFilterForm');
+        const formData = new FormData(form);
+
+        const restrictedDays = formData.getAll('restricted_days').map(Number);
+        const restrictedSlots = formData.getAll('restricted_slots').map(Number);
+
+        const data = {
+            teacher: formData.get('teacher'),
+            restricted_days: restrictedDays,
+            restricted_slots: restrictedSlots
+        };
+
+        try {
+            const response = await fetch('/add-negative-filter', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    teacher: data.teacher,
+                    restricted_days: data.restricted_days.join(','),
+                    restricted_slots: data.restricted_slots.join(',')
+                })
+            });
+
+            if (response.ok) {
+                this.showSuccess('Ограничения сохранены');
+                form.reset();
+                await this.loadFilters();
+            } else {
+                throw new Error(await response.text());
+            }
+        } catch (error) {
+            this.showError('Ошибка сохранения ограничений: ' + error.message);
+        }
+    }
+
+    async saveSchedule() {
+        const form = document.getElementById('saveScheduleForm');
+        const formData = new FormData(form);
+        const name = formData.get('name');
+
+        if (!name) {
+            this.showError('Введите название расписания');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/schedules/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name: name,
+                    lessons: this.lessons
+                })
+            });
+
+            if (response.ok) {
+                this.showSuccess('Расписание сохранено');
+                form.reset();
+                await this.loadSavedSchedules();
+            } else {
+                throw new Error(await response.text());
+            }
+        } catch (error) {
+            this.showError('Ошибка сохранения: ' + error.message);
+        }
+    }
+
+    async loadSchedule(scheduleId) {
+        try {
+            const response = await fetch(`/api/schedules/${scheduleId}`);
+            if (response.ok) {
+                const schedule = await response.json();
+                this.lessons = schedule.lessons;
+                this.renderSchedule();
+                this.showSuccess('Расписание загружено');
+                await this.updateStatistics();
+            } else {
+                throw new Error(await response.text());
+            }
+        } catch (error) {
+            this.showError('Ошибка загрузки расписания: ' + error.message);
+        }
+    }
+
+    async deleteSchedule(scheduleId) {
+        if (!confirm('Удалить это сохраненное расписание?')) return;
+
+        try {
+            const response = await fetch(`/api/schedules/${scheduleId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                this.showSuccess('Расписание удалено');
+                await this.loadSavedSchedules();
+            } else {
+                throw new Error(await response.text());
+            }
+        } catch (error) {
+            this.showError('Ошибка удаления расписания: ' + error.message);
+        }
+    }
+
+    async generateSchedule() {
+        this.showLoading();
+
+        try {
+            const response = await fetch('/api/schedule/generate', {
+                method: 'POST'
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                this.showSuccess(`Сгенерировано ${result.lessons.length} пар`);
+                await this.loadLessons();
+                await this.updateStatistics();
+            } else {
+                throw new Error(result.detail || 'Ошибка генерации');
+            }
+        } catch (error) {
+            this.showError('Ошибка генерации: ' + error.message);
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    async clearAllData() {
+        if (!confirm('ВНИМАНИЕ! Это действие удалит все данные. Продолжить?')) return;
+
+        try {
+            const response = await fetch('/clear-all', {
+                method: 'POST'
+            });
+
+            if (response.ok) {
+                this.showSuccess('Все данные очищены');
+                await this.loadInitialData();
+                await this.updateStatistics();
+            } else {
+                throw new Error(await response.text());
+            }
+        } catch (error) {
+            this.showError('Ошибка очистки: ' + error.message);
+        }
+    }
+
+    async updateStatistics() {
+    try {
+        const response = await fetch('/api/statistics');
+        if (response.ok) {
+            const stats = await response.json();
+
+            document.getElementById('statSubjects').textContent = stats.total_subjects;
+            document.getElementById('statTeachers').textContent = stats.total_teachers;
+            document.getElementById('statPairs').textContent = stats.scheduled_pairs;
+            document.getElementById('statTotalHours').textContent = stats.total_hours;
+            document.getElementById('statRemainingHours').textContent = stats.remaining_hours;
+        }
+    } catch (error) {
+        console.error('Error loading statistics:', error);
+    }
 }
 
-// Восстановление темы при загрузке
+// Автообновление при любых изменениях
+async refreshAllData() {
+    await Promise.all([
+        this.loadTeachers(),
+        this.loadSubjects(),
+        this.loadLessons(),
+        this.updateStatistics()
+    ]);
+}
+
+    showLoading() {
+        document.getElementById('loadingSpinner').style.display = 'flex';
+    }
+
+    hideLoading() {
+        document.getElementById('loadingSpinner').style.display = 'none';
+    }
+
+    showSuccess(message) {
+        this.showNotification(message, 'success');
+    }
+
+    showError(message) {
+        this.showNotification(message, 'error');
+    }
+
+    showNotification(message, type = 'info') {
+        // Создаем уведомление
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.innerHTML = `
+            <div class="notification-content">
+                <i class="fas fa-${type === 'success' ? 'check' : 'exclamation-triangle'}"></i>
+                <span>${message}</span>
+            </div>
+        `;
+
+        // Стили для уведомления
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${type === 'success' ? '#10b981' : '#ef4444'};
+            color: white;
+            padding: 12px 16px;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1003;
+            animation: slideInRight 0.3s ease;
+        `;
+
+        document.body.appendChild(notification);
+
+        // Автоматическое скрытие
+        setTimeout(() => {
+            notification.style.animation = 'slideOutRight 0.3s ease';
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }, 3000);
+    }
+}
+
+// Добавляем CSS анимации для уведомлений
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideInRight {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    
+    @keyframes slideOutRight {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+    }
+    
+    .notification-content {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+`;
+document.head.appendChild(style);
+
+// Инициализация приложения
+let app;
 document.addEventListener('DOMContentLoaded', () => {
-    const saved = localStorage.getItem('theme') || 'light';
-    document.documentElement.setAttribute('data-theme', saved);
+    app = new ScheduleApp();
 });
-
-// Контекстное меню для слотов
-document.addEventListener('contextmenu', function(e) {
-    const slot = e.target.closest('.schedule-cell');
-    if (!slot) return;
-
-    e.preventDefault();
-
-    const day = slot.dataset.day;
-    const timeSlot = slot.dataset.timeSlot;
-    const weekStart = document.getElementById('weekStart')?.value || '2025-09-22'; // заглушка
-
-    // Открыть модальное окно для редактирования
-    openEditModal(day, timeSlot, weekStart);
-});
-
-function openEditModal(day, timeSlot, weekStart) {
-    // Пока просто alert — позже заменим на модалку
-    alert(`Редактирование слота: день=${day}, пара=${timeSlot}, неделя=${weekStart}`);
-}
-
-// Переключение недели
-function changeWeek(dateStr) {
-    // Пока просто перезагрузка — позже сделаем AJAX
-    window.location.search = `?week=${dateStr}`;
-}
-
-// Обновление списка преподавателей
-function updateTeacherSelect() {
-    const select = document.getElementById('filter_teacher');
-    if (!select) return;
-
-    const subjects = JSON.parse(document.getElementById('subjects-data').textContent);
-    const teachers = [...new Set(subjects.map(s => s.teacher))];
-
-    select.innerHTML = '<option value="">Выберите преподавателя</option>';
-    teachers.forEach(t => {
-        const opt = document.createElement('option');
-        opt.value = t;
-        opt.textContent = t;
-        select.appendChild(opt);
-    });
-}
-
-// Инициализация
-document.addEventListener('DOMContentLoaded', updateTeacherSelect);

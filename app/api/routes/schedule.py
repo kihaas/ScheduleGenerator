@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, Form, HTTPException
 from fastapi.responses import RedirectResponse
 from app.services.schedule_services import schedule_service
 
-router = APIRouter()
+router = APIRouter(tags=["schedule"])
 
 @router.post("/generate-schedule")
 async def generate_schedule_route(request: Request):

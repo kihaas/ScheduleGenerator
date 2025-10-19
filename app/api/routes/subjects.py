@@ -9,10 +9,12 @@ async def add_subject(
     request: Request,
     teacher: str = Form(...),
     subject_name: str = Form(...),
-    hours: int = Form(...)
+    hours: int = Form(...),
+    priority: int = Form(0),
+    max_per_day: int = Form(2)
 ):
     try:
-        await subject_service.create_subject(teacher, subject_name, hours)
+        await subject_service.create_subject(teacher, subject_name, hours, priority, max_per_day)
         return RedirectResponse(url="/", status_code=303)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Ошибка добавления предмета: {str(e)}")
@@ -20,11 +22,13 @@ async def add_subject(
 @router.post("/remove-subject/{subject_id}")
 async def remove_subject(subject_id: int):
     try:
+        print(f"API: Removing subject {subject_id}")
         success = await subject_service.delete_subject(subject_id)
         if not success:
             raise HTTPException(status_code=404, detail="Предмет не найден")
         return RedirectResponse(url="/", status_code=303)
     except Exception as e:
+        print(f"API: Error removing subject {subject_id}: {e}")
         raise HTTPException(status_code=400, detail=f"Ошибка удаления предмета: {str(e)}")
 
 @router.post("/add-negative-filter")

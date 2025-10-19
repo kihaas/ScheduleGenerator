@@ -1,6 +1,40 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from typing import Optional, List, Dict, Set
+from datetime import datetime
 import json
+
+
+class UserBase(BaseModel):
+    email: EmailStr
+    name: str
+
+
+class UserCreate(UserBase):
+    password: str
+
+
+class User(UserBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class TeacherBase(BaseModel):
+    name: str
+
+
+class TeacherCreate(TeacherBase):
+    pass
+
+
+class Teacher(TeacherBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 
 class SubjectBase(BaseModel):
@@ -16,6 +50,9 @@ class SubjectCreate(SubjectBase):
 
 class Subject(SubjectBase):
     id: Optional[int] = None
+    remaining_pairs: int = 0
+    priority: int = 0
+    max_per_day: int = 2
 
     class Config:
         from_attributes = True
@@ -34,7 +71,7 @@ class LessonCreate(LessonBase):
 
 class Lesson(LessonBase):
     id: Optional[int] = None
-    is_past: bool = False
+    editable: bool = True
 
     class Config:
         from_attributes = True
@@ -55,7 +92,35 @@ class NegativeFilter(NegativeFilterBase):
         from_attributes = True
 
 
+class SavedScheduleBase(BaseModel):
+    name: str
+    user_id: Optional[int] = None
+
+
+class SavedScheduleCreate(SavedScheduleBase):
+    pass
+
+
+class SavedSchedule(SavedScheduleBase):
+    id: int
+    created_at: datetime
+    payload: Dict
+
+    class Config:
+        from_attributes = True
+
+
 class ScheduleData(BaseModel):
     subjects: List[Subject]
     lessons: List[Lesson]
+    teachers: List[Teacher]
     negative_filters: Dict[str, NegativeFilter] = {}
+
+
+class Statistics(BaseModel):
+    total_subjects: int
+    total_teachers: int
+    total_hours: int
+    remaining_hours: int
+    scheduled_pairs: int
+    remaining_pairs: int
