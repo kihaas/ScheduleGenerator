@@ -15,9 +15,9 @@ class ScheduleApp {
         this.setupThemeToggle();
         await this.loadInitialData();
         this.renderSchedule();
-        this.updateStatistics();
-    }
-
+        await this.refreshAllData();
+        await this.updateStatistics();
+}
     setupEventListeners() {
         // Sidebar toggle
         document.getElementById('sidebarToggle').addEventListener('click', () => {
@@ -143,18 +143,18 @@ class ScheduleApp {
     }
 
     async loadInitialData() {
-        try {
-            await Promise.all([
-                this.loadTeachers(),
-                this.loadSubjects(),
-                this.loadLessons(),
-                this.loadSavedSchedules(),
-                this.loadFilters()
-            ]);
-        } catch (error) {
-            this.showError('Ошибка загрузки данных: ' + error.message);
-        }
+    try {
+        await Promise.all([
+            this.loadTeachers(),
+            this.loadSubjects(),  // Теперь загружаем предметы из правильного эндпоинта
+            this.loadLessons(),
+            this.loadSavedSchedules(),
+            this.loadFilters()
+        ]);
+    } catch (error) {
+        this.showError('Ошибка загрузки данных: ' + error.message);
     }
+}
 
     async loadTeachers() {
         try {
@@ -170,16 +170,19 @@ class ScheduleApp {
     }
 
     async loadSubjects() {
-        try {
-            const response = await fetch('/api/lessons');
-            if (response.ok) {
-                this.subjects = await response.json();
-                this.renderSubjectsList();
-            }
-        } catch (error) {
-            console.error('Error loading subjects:', error);
+    try {
+        const response = await fetch('/api/subjects');
+        if (response.ok) {
+            this.subjects = await response.json();
+            this.renderSubjectsList();
+        } else {
+            throw new Error('Failed to load subjects');
         }
+    } catch (error) {
+        console.error('Error loading subjects:', error);
+        this.showError('Ошибка загрузки предметов: ' + error.message);
     }
+}
 
     async loadLessons() {
         try {
@@ -250,25 +253,46 @@ class ScheduleApp {
     }
 
     renderSubjectsList() {
-        const container = document.getElementById('subjectsList');
-        if (!this.subjects.length) {
-            container.innerHTML = '<div class="empty-state">Нет добавленных предметов</div>';
-            return;
-        }
+    const container = document.getElementById('subjectsList');
+    if (!this.subjects || this.subjects.length === 0) {
+        container.innerHTML = '<div class="empty-state">Нет добавленных предметов</div>';
+        return;
+    }
 
-        container.innerHTML = this.subjects.map(subject => `
+    container.innerHTML = this.subjects.map(subject => {
+        // Рассчитываем прогресс
+        const consumedHours = subject.total_hours - subject.remaining_hours;
+        const progressPercent = subject.total_hours > 0 ? (consumedHours / subject.total_hours) * 100 : 0;
+
+        console.log(`Subject: ${subject.subject_name}, Total: ${subject.total_hours}, Remaining: ${subject.remaining_hours}, Progress: ${progressPercent}%`);
+
+        return `
             <div class="subject-item" data-id="${subject.id}">
                 <div class="subject-info">
                     <strong>${subject.subject_name}</strong>
                     <div class="teacher-name">${subject.teacher}</div>
+                    <div class="hours-info">
+                        <div class="hours-progress">
+                            ${consumedHours} / ${subject.total_hours} часов
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${progressPercent}%"></div>
+                        </div>
+                        <div class="pairs-info">
+                            ${subject.remaining_pairs} пар осталось
+                        </div>
+                    </div>
                 </div>
-                <div class="hours-badge">${subject.remaining_pairs}п</div>
-                <button class="btn-danger btn-small" onclick="app.deleteSubject(${subject.id})">
-                    <i class="fas fa-times"></i>
-                </button>
+                <div class="subject-actions">
+                    <div class="priority-badge">Приоритет: ${subject.priority}</div>
+                    <button class="btn-danger btn-small" onclick="app.deleteSubject(${subject.id})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
             </div>
-        `).join('');
-    }
+        `;
+    }).join('');
+}
 
     renderSavedSchedulesList() {
         const container = document.getElementById('savedSchedulesList');
@@ -502,79 +526,109 @@ class ScheduleApp {
         }
     }
 
-    async deleteTeacher(teacherId) {
-        if (!confirm('Удалить этого преподавателя?')) return;
+   async deleteTeacher(teacherId) {
+    if (!confirm('Удалить этого преподавателя?')) return;
 
-        try {
-            const response = await fetch(`/api/teachers/${teacherId}`, {
-                method: 'DELETE'
-            });
+    this.showLoading();
 
-            if (response.ok) {
-                this.showSuccess('Преподаватель удален');
-                await this.loadTeachers();
-                await this.updateStatistics();
-            } else {
-                throw new Error(await response.text());
-            }
-        } catch (error) {
-            this.showError('Ошибка удаления преподавателя: ' + error.message);
+    try {
+        const response = await fetch(`/api/teachers/${teacherId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            this.showSuccess('Преподаватель удален');
+            await this.loadTeachers();
+            await this.loadSubjects(); // Перезагружаем предметы т.к. они связаны
+            await this.updateStatistics();
+        } else {
+            const result = await response.json();
+            throw new Error(result.detail || result.error || 'Ошибка удаления преподавателя');
         }
+    } catch (error) {
+        this.showError('Ошибка удаления преподавателя: ' + error.message);
+    } finally {
+        this.hideLoading();
     }
+}
 
     async addSubject() {
-        const form = document.getElementById('addSubjectForm');
-        const formData = new FormData(form);
+    const form = document.getElementById('addSubjectForm');
+    const formData = new FormData(form);
 
-        const data = {
-            teacher: formData.get('teacher'),
-            subject_name: formData.get('subject_name'),
-            hours: parseInt(formData.get('hours')),
-            priority: parseInt(formData.get('priority')) || 0,
-            max_per_day: parseInt(formData.get('max_per_day')) || 2
-        };
+    const data = {
+        teacher: formData.get('teacher'),
+        subject_name: formData.get('subject_name'),
+        hours: parseInt(formData.get('hours')),
+        priority: parseInt(formData.get('priority')) || 0,
+        max_per_day: parseInt(formData.get('max_per_day')) || 2
+    };
 
-        try {
-            const response = await fetch('/add-subject', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: new URLSearchParams(data)
-            });
-
-            if (response.ok) {
-                this.showSuccess('Предмет добавлен');
-                form.reset();
-                await this.loadSubjects();
-                await this.updateStatistics();
-            } else {
-                throw new Error(await response.text());
-            }
-        } catch (error) {
-            this.showError('Ошибка добавления предмета: ' + error.message);
-        }
+    // Валидация
+    if (!data.teacher || !data.subject_name || !data.hours) {
+        this.showError('Заполните все обязательные поля');
+        return;
     }
 
-    async deleteSubject(subjectId) {
-        if (!confirm('Удалить этот предмет?')) return;
+    this.showLoading();
 
-        try {
-            const response = await fetch(`/remove-subject/${subjectId}`, {
-                method: 'POST'
-            });
+    try {
+        const response = await fetch('/api/subjects', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
 
-            if (response.ok) {
-                this.showSuccess('Предмет удален');
-                await this.loadSubjects();
-                await this.updateStatistics();
+        const result = await response.json();
+
+        if (response.ok) {
+            this.showSuccess('Предмет добавлен');
+            form.reset();
+            // Перезагружаем список предметов
+            await this.loadSubjects();
+            await this.updateStatistics();
+        } else {
+            if (response.status === 409) {
+                this.showError('Предмет с таким названием уже существует у этого преподавателя');
             } else {
-                throw new Error(await response.text());
+                throw new Error(result.detail || result.error || 'Ошибка добавления предмета');
             }
-        } catch (error) {
-            this.showError('Ошибка удаления предмета: ' + error.message);
         }
+    } catch (error) {
+        this.showError('Ошибка добавления предмета: ' + error.message);
+    } finally {
+        this.hideLoading();
     }
+}
+
+async deleteSubject(subjectId) {
+    if (!confirm('Удалить этот предмет?')) return;
+
+    this.showLoading();
+
+    try {
+        const response = await fetch(`/remove-subject/${subjectId}`, {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            this.showSuccess('Предмет удален');
+            // Перезагружаем список предметов
+            await this.loadSubjects();
+            await this.updateStatistics();
+        } else {
+            const errorText = await response.text();
+            throw new Error(errorText);
+        }
+    } catch (error) {
+        this.showError('Ошибка удаления предмета: ' + error.message);
+    } finally {
+        this.hideLoading();
+}
+}
+
 
     async addNegativeFilter() {
         const form = document.getElementById('addFilterForm');
@@ -665,48 +719,55 @@ class ScheduleApp {
         }
     }
 
-    async deleteSchedule(scheduleId) {
-        if (!confirm('Удалить это сохраненное расписание?')) return;
+    async deleteSubject(subjectId) {
+    if (!confirm('Удалить этот предмет?')) return;
 
-        try {
-            const response = await fetch(`/api/schedules/${scheduleId}`, {
-                method: 'DELETE'
-            });
+    this.showLoading();
 
-            if (response.ok) {
-                this.showSuccess('Расписание удалено');
-                await this.loadSavedSchedules();
-            } else {
-                throw new Error(await response.text());
-            }
-        } catch (error) {
-            this.showError('Ошибка удаления расписания: ' + error.message);
+    try {
+        const response = await fetch(`/api/subjects/${subjectId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            this.showSuccess('Предмет удален');
+            // Перезагружаем список предметов
+            await this.loadSubjects();
+            await this.updateStatistics();
+        } else {
+            const result = await response.json();
+            throw new Error(result.detail || result.error || 'Ошибка удаления предмета');
         }
+    } catch (error) {
+        this.showError('Ошибка удаления предмета: ' + error.message);
+    } finally {
+        this.hideLoading();
     }
+}
 
     async generateSchedule() {
-        this.showLoading();
+    this.showLoading();
 
-        try {
-            const response = await fetch('/api/schedule/generate', {
-                method: 'POST'
-            });
+    try {
+        const response = await fetch('/api/schedule/generate', {
+            method: 'POST'
+        });
 
-            const result = await response.json();
+        const result = await response.json();
 
-            if (response.ok) {
-                this.showSuccess(`Сгенерировано ${result.lessons.length} пар`);
-                await this.loadLessons();
-                await this.updateStatistics();
-            } else {
-                throw new Error(result.detail || 'Ошибка генерации');
-            }
-        } catch (error) {
-            this.showError('Ошибка генерации: ' + error.message);
-        } finally {
-            this.hideLoading();
+        if (response.ok) {
+            this.showSuccess(`Сгенерировано ${result.lessons.length} пар`);
+            // Автоматически обновляем все данные
+            await this.refreshAllData();
+        } else {
+            throw new Error(result.detail || 'Ошибка генерации');
         }
+    } catch (error) {
+        this.showError('Ошибка генерации: ' + error.message);
+    } finally {
+        this.hideLoading();
     }
+}
 
     async clearAllData() {
         if (!confirm('ВНИМАНИЕ! Это действие удалит все данные. Продолжить?')) return;
@@ -747,12 +808,16 @@ class ScheduleApp {
 
 // Автообновление при любых изменениях
 async refreshAllData() {
-    await Promise.all([
-        this.loadTeachers(),
-        this.loadSubjects(),
-        this.loadLessons(),
-        this.updateStatistics()
-    ]);
+    try {
+        await Promise.all([
+            this.loadSubjects(),
+            this.loadLessons(),
+            this.updateStatistics()
+        ]);
+        this.renderSchedule();
+    } catch (error) {
+        console.error('Error refreshing data:', error);
+    }
 }
 
     showLoading() {

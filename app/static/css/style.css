@@ -926,3 +926,165 @@ button {
     background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%) !important;
     color: #d97706 !important;
 }
+
+
+.subject-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+}
+
+.priority-badge {
+    background: var(--primary);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.hours-info {
+    margin-top: 4px;
+    font-size: 0.7rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.hours-progress {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.pairs-info {
+    color: var(--secondary);
+    font-size: 0.65rem;
+}
+
+/* Progress bar for hours */
+.progress-bar {
+    width: 100%;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 4px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: var(--success);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+[data-theme="dark"] .progress-bar {
+    background: #475569;
+}
+
+/* Progress bar styles */
+.hours-info {
+    margin-top: 8px;
+    font-size: 0.8rem;
+}
+
+.hours-progress {
+    color: var(--primary);
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.pairs-info {
+    color: var(--secondary);
+    font-size: 0.75rem;
+    margin-top: 2px;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 4px 0;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--success), #22c55e);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    box-shadow: 0 1px 3px rgba(34, 197, 94, 0.3);
+}
+
+[data-theme="dark"] .progress-bar {
+    background: #475569;
+}
+
+.subject-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    min-width: 80px;
+}
+
+.priority-badge {
+    background: var(--primary);
+    color: white;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.subject-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px;
+    background: var(--light);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    border: 1px solid var(--border);
+    transition: var(--transition);
+}
+
+[data-theme="dark"] .subject-item {
+    background: #334155;
+    border-color: #475569;
+}
+
+.subject-item:hover {
+    background: #f1f5f9;
+    transform: translateY(-1px);
+}
+
+[data-theme="dark"] .subject-item:hover {
+    background: #475569;
+}
+
+.subject-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.subject-info strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 0.9rem;
+    color: var(--dark);
+}
+
+[data-theme="dark"] .subject-info strong {
+    color: white;
+}
+
+.teacher-name {
+    font-size: 0.8rem;
+    color: var(--secondary);
+    margin-bottom: 8px;
+}

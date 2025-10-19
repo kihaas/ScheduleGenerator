@@ -4,3 +4,5 @@ aiosqlite
 jinja2
 python-multipart
 pydantic
+passlib[bcrypt]
+bcrypt

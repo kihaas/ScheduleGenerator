@@ -1,10 +1,9 @@
-from fastapi import FastAPI, Request, Depends
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.exception_handlers import http_exception_handler
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from typing import Optional
 
 from app.db.database import database
 from app.api.routes import api_router
@@ -31,63 +30,9 @@ app.include_router(api_router)
 async def startup_event():
     """Инициализация приложения"""
     print("🔄 Инициализация базы данных...")
-    await database.init_db()
-    await run_migrations()
+    await database.init_db()  # ТОЛЬКО ЭТО - больше никаких миграций
     print("✅ База данных готова")
     print("✅ Приложение готово")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Завершение работы приложения"""
-    print("🔴 Приложение завершает работу")
-
-
-async def run_migrations():
-    """Выполнение миграций"""
-    try:
-        # Миграция для новых полей
-        await database.execute('''
-            CREATE TABLE IF NOT EXISTS teachers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL UNIQUE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-
-        await database.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT NOT NULL UNIQUE,
-                name TEXT NOT NULL,
-                password_hash TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-
-        # Добавляем недостающие колонки если их нет
-        await database.execute('''
-            CREATE TABLE IF NOT EXISTS saved_schedules (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                name TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                payload TEXT NOT NULL
-            )
-        ''')
-
-        # Создаем индексы для производительности
-        await database.execute('''
-            CREATE INDEX IF NOT EXISTS idx_lessons_day_time ON lessons(day, time_slot)
-        ''')
-        await database.execute('''
-            CREATE INDEX IF NOT EXISTS idx_subjects_teacher ON subjects(teacher_name)
-        ''')
-
-        print("✅ Миграции выполнены успешно")
-
-    except Exception as e:
-        print(f"⚠️ Ошибка миграций: {e}")
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -115,15 +60,22 @@ async def general_exception_handler(request: Request, exc: Exception):
 async def read_root(request: Request):
     """Главная страница приложения"""
     try:
-        subjects = [s.model_dump() for s in await subject_service.get_all_subjects()]
-        lessons = [l.model_dump() for l in await schedule_service.get_all_lessons()]
-        teachers = [t.model_dump() for t in await teacher_service.get_all_teachers()]
-        negative_filters = {
-            teacher: nf.model_dump()
-            for teacher, nf in (await subject_service.get_negative_filters()).items()
-        }
+        # Пока загружаем только базовые данные без предметов
+        teachers = []
+        lessons = []
+        negative_filters = {}
 
-        # Создаем матрицу расписания для шаблона
+        try:
+            teachers = [t.model_dump() for t in await teacher_service.get_all_teachers()]
+            lessons = [l.model_dump() for l in await schedule_service.get_all_lessons()]
+            negative_filters = {
+                teacher: nf.model_dump()
+                for teacher, nf in (await subject_service.get_negative_filters()).items()
+            }
+        except Exception as e:
+            print(f"⚠️ Предупреждение при загрузке данных: {e}")
+
+        # Создаем пустую матрицу расписания для шаблона
         schedule_matrix = [[None for _ in range(4)] for _ in range(7)]
         for lesson in lessons:
             day = lesson['day']
@@ -133,7 +85,6 @@ async def read_root(request: Request):
 
         return templates.TemplateResponse("index.html", {
             "request": request,
-            "subjects": subjects,
             "teachers": teachers,
             "negative_filters": negative_filters,
             "schedule_matrix": schedule_matrix,
@@ -163,5 +114,4 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)

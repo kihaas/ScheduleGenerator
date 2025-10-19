@@ -1,6 +1,9 @@
 from typing import List, Dict, Tuple
 import random
+
+from app.db import database
 from app.db.models import Lesson, Subject
+from app.services.subject_services import subject_service
 
 
 class ScheduleGenerator:
@@ -9,48 +12,81 @@ class ScheduleGenerator:
     def __init__(self):
         self.occupied_slots = set()
 
-    async def generate_schedule(self, subjects: List[Subject], negative_filters: Dict) -> List[Lesson]:
-        """Генерация расписания (чистая функция для тестирования)"""
+    async def generate_schedule(self) -> List[Lesson]:
+        """Генерация расписания"""
+        print("🔄 Начинаем генерацию расписания...")
+
+        subjects = await subject_service.get_all_subjects()
+        print(f"📚 Найдено предметов: {len(subjects)}")
+
         if not subjects:
+            print("❌ Нет предметов для генерации")
             return []
 
-        subject_state = self._initialize_subject_state(subjects)
-        daily_teacher_count = self._initialize_daily_count(subjects, 'teacher')
-        daily_subject_count = self._initialize_daily_count(subjects, 'subject')
+        # Очищаем текущее расписание
+        await database.execute('DELETE FROM lessons')
 
+        # Сбрасываем remaining_pairs для всех предметов
+        for subject in subjects:
+            await database.execute(
+                'UPDATE subjects SET remaining_pairs = ?, remaining_hours = ? WHERE id = ?',
+                (subject.total_hours // 2, subject.total_hours, subject.id)
+            )
+
+        # Перезагружаем предметы с обновленными данными
+        subjects = await subject_service.get_all_subjects()
+
+        # Создаем уроки
         lessons = []
-        self.occupied_slots.clear()
+        subject_index = 0
 
-        # Slot-first алгоритм
         for day in range(5):  # Пн-Пт
-            for time_slot in range(4):  # 4 пары в день
-                slot_key = (day, time_slot)
+            for time_slot in range(4):  # 4 пары
+                if not subjects:
+                    break
 
-                candidates = self._get_candidates_for_slot(
-                    day, time_slot, subjects, subject_state, daily_teacher_count,
-                    daily_subject_count, negative_filters
-                )
+                # Ищем предмет с оставшимися парами
+                subject_found = None
+                for i in range(len(subjects)):
+                    subject = subjects[(subject_index + i) % len(subjects)]
+                    if subject.remaining_pairs > 0:
+                        subject_found = subject
+                        break
 
-                if not candidates:
-                    continue
-
-                selected = self._select_candidate(candidates)
-                if not selected:
-                    continue
+                if not subject_found:
+                    break
 
                 lesson = Lesson(
                     day=day,
                     time_slot=time_slot,
-                    teacher=selected['teacher'],
-                    subject_name=selected['subject_name'],
+                    teacher=subject_found.teacher,
+                    subject_name=subject_found.subject_name,
                     editable=True
                 )
                 lessons.append(lesson)
-                self.occupied_slots.add(slot_key)
 
-                self._update_state_after_selection(
-                    selected, day, subject_state, daily_teacher_count, daily_subject_count
+                # Уменьшаем количество оставшихся пар и часов
+                await database.execute(
+                    'UPDATE subjects SET remaining_pairs = remaining_pairs - 1, remaining_hours = remaining_hours - 2 WHERE id = ?',
+                    (subject_found.id,)
                 )
+
+                subject_index += 1
+
+        # Сохраняем уроки
+        for lesson in lessons:
+            await database.execute(
+                'INSERT INTO lessons (day, time_slot, teacher, subject_name, editable) VALUES (?, ?, ?, ?, ?)',
+                (lesson.day, lesson.time_slot, lesson.teacher, lesson.subject_name, int(lesson.editable))
+            )
+
+        print(f"✅ Сгенерировано уроков: {len(lessons)}")
+
+        # Логируем итоговое состояние предметов
+        final_subjects = await subject_service.get_all_subjects()
+        for subject in final_subjects:
+            print(
+                f"📊 {subject.teacher} - {subject.subject_name}: {subject.remaining_hours}ч осталось, {subject.remaining_pairs} пар")
 
         return lessons
 
