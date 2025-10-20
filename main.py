@@ -60,22 +60,21 @@ async def general_exception_handler(request: Request, exc: Exception):
 async def read_root(request: Request):
     """Главная страница приложения"""
     try:
-        # Пока загружаем только базовые данные без предметов
-        teachers = []
-        lessons = []
-        negative_filters = {}
+        subjects = [s.model_dump() for s in await subject_service.get_all_subjects()]
+        lessons = [l.model_dump() for l in await schedule_service.get_all_lessons()]
+        teachers = [t.model_dump() for t in await teacher_service.get_all_teachers()]
 
+        # Безопасное получение фильтров
         try:
-            teachers = [t.model_dump() for t in await teacher_service.get_all_teachers()]
-            lessons = [l.model_dump() for l in await schedule_service.get_all_lessons()]
             negative_filters = {
                 teacher: nf.model_dump()
                 for teacher, nf in (await subject_service.get_negative_filters()).items()
             }
         except Exception as e:
-            print(f"⚠️ Предупреждение при загрузке данных: {e}")
+            print(f"⚠️ Ошибка загрузки фильтров: {e}")
+            negative_filters = {}
 
-        # Создаем пустую матрицу расписания для шаблона
+        # Создаем матрицу расписания для шаблона
         schedule_matrix = [[None for _ in range(4)] for _ in range(7)]
         for lesson in lessons:
             day = lesson['day']
@@ -85,6 +84,7 @@ async def read_root(request: Request):
 
         return templates.TemplateResponse("index.html", {
             "request": request,
+            "subjects": subjects,
             "teachers": teachers,
             "negative_filters": negative_filters,
             "schedule_matrix": schedule_matrix,

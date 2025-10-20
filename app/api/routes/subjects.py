@@ -26,6 +26,11 @@ class SubjectCreateRequest(BaseModel):
     priority: int = 0
     max_per_day: int = 2
 
+class NegativeFilterRequest(BaseModel):
+    teacher: str
+    restricted_days: List[int] = []
+    restricted_slots: List[int] = []
+
 
 @router.get("/api/subjects", response_model=List[SubjectResponse])
 async def get_all_subjects():
@@ -122,3 +127,55 @@ async def add_subject(
         return JSONResponse(status_code=303, headers={"Location": "/"})
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Ошибка добавления предмета: {str(e)}")
+
+
+@router.post("/api/negative-filters")
+async def add_negative_filter_api(request: NegativeFilterRequest):
+    """Добавить ограничения для преподавателя"""
+    try:
+        await subject_service.save_negative_filter(
+            request.teacher,
+            request.restricted_days,
+            request.restricted_slots
+        )
+        return JSONResponse(
+            status_code=200,
+            content={"success": True, "message": "Ограничения сохранены"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Ошибка сохранения ограничений: {str(e)}")
+
+@router.get("/api/negative-filters")
+async def get_negative_filters_api():
+    """Получить все ограничения"""
+    try:
+        filters = await subject_service.get_negative_filters()
+        return filters
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка получения ограничений: {str(e)}")
+
+@router.delete("/api/negative-filters/{teacher}")
+async def remove_negative_filter_api(teacher: str):
+    """Удалить ограничения для преподавателя"""
+    try:
+        await subject_service.remove_negative_filter(teacher)
+        return JSONResponse(
+            status_code=200,
+            content={"success": True, "message": "Ограничения удалены"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Ошибка удаления ограничений: {str(e)}")
+
+# Старый эндпоинт для обратной совместимости
+@router.post("/add-negative-filter")
+async def add_negative_filter_old(
+    teacher: str = Form(...),
+    restricted_days: List[int] = Form([]),
+    restricted_slots: List[int] = Form([])
+):
+    """Старый эндпоинт для обратной совместимости"""
+    try:
+        await subject_service.save_negative_filter(teacher, restricted_days, restricted_slots)
+        return JSONResponse(status_code=303, headers={"Location": "/"})
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Ошибка сохранения фильтра: {str(e)}")

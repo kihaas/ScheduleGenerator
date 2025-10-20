@@ -188,16 +188,15 @@ class ScheduleService:
             scheduled_pairs = len(lessons)
             remaining_pairs = sum(s.remaining_pairs for s in subjects)
 
-            print(
-                f"📊 Статистика: {len(subjects)} предметов, {len(teachers)} преподавателей, {scheduled_pairs} пар, {remaining_hours}ч осталось")
+            print(f"📊 Статистика: {len(subjects)} предметов, {total_hours}ч всего, {remaining_hours}ч осталось")
 
             return {
                 'total_subjects': len(subjects),
-                'total_teachers': len(teachers),
+                'total_teachers': len(teachers),  # Оставляем для совместимости
                 'total_hours': total_hours,
                 'remaining_hours': remaining_hours,
-                'scheduled_pairs': scheduled_pairs,
-                'remaining_pairs': remaining_pairs
+                'scheduled_pairs': scheduled_pairs,  # Оставляем для совместимости
+                'remaining_pairs': remaining_pairs  # Оставляем для совместимости
             }
         except Exception as e:
             print(f"❌ Ошибка в статистике: {e}")

@@ -67,9 +67,6 @@ class ScheduleApp {
             this.clearAllData();
         });
 
-        document.getElementById('refreshStats').addEventListener('click', () => {
-            this.updateStatistics();
-        });
 
         // Context menu
         document.addEventListener('contextmenu', (e) => {
@@ -586,9 +583,9 @@ class ScheduleApp {
         if (response.ok) {
             this.showSuccess('Предмет добавлен');
             form.reset();
-            // Перезагружаем список предметов
+            // Автообновление статистики и предметов
             await this.loadSubjects();
-            await this.updateStatistics();
+            await this.updateStatistics(); // АВТООБНОВЛЕНИЕ
         } else {
             if (response.status === 409) {
                 this.showError('Предмет с таким названием уже существует у этого преподавателя');
@@ -609,24 +606,48 @@ async deleteSubject(subjectId) {
     this.showLoading();
 
     try {
-        const response = await fetch(`/remove-subject/${subjectId}`, {
-            method: 'POST'
+        const response = await fetch(`/api/subjects/${subjectId}`, {
+            method: 'DELETE'
         });
 
         if (response.ok) {
             this.showSuccess('Предмет удален');
-            // Перезагружаем список предметов
+            // Автообновление статистики и предметов
             await this.loadSubjects();
-            await this.updateStatistics();
+            await this.updateStatistics(); // АВТООБНОВЛЕНИЕ
         } else {
-            const errorText = await response.text();
-            throw new Error(errorText);
+            const result = await response.json();
+            throw new Error(result.detail || result.error || 'Ошибка удаления предмета');
         }
     } catch (error) {
         this.showError('Ошибка удаления предмета: ' + error.message);
     } finally {
         this.hideLoading();
+    }
 }
+
+async generateSchedule() {
+    this.showLoading();
+
+    try {
+        const response = await fetch('/api/schedule/generate', {
+            method: 'POST'
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            this.showSuccess(`Сгенерировано ${result.lessons.length} пар`);
+            // Автообновление ВСЕХ данных
+            await this.refreshAllData();
+        } else {
+            throw new Error(result.detail || 'Ошибка генерации');
+        }
+    } catch (error) {
+        this.showError('Ошибка генерации: ' + error.message);
+    } finally {
+        this.hideLoading();
+    }
 }
 
 
@@ -795,24 +816,24 @@ async deleteSubject(subjectId) {
         if (response.ok) {
             const stats = await response.json();
 
+            // Обновляем новые параметры
             document.getElementById('statSubjects').textContent = stats.total_subjects;
-            document.getElementById('statTeachers').textContent = stats.total_teachers;
-            document.getElementById('statPairs').textContent = stats.scheduled_pairs;
             document.getElementById('statTotalHours').textContent = stats.total_hours;
             document.getElementById('statRemainingHours').textContent = stats.remaining_hours;
+
+            console.log(`📊 Статистика обновлена: ${stats.total_subjects} предметов, ${stats.total_hours}ч всего, ${stats.remaining_hours}ч осталось`);
         }
     } catch (error) {
         console.error('Error loading statistics:', error);
     }
 }
-
 // Автообновление при любых изменениях
 async refreshAllData() {
     try {
         await Promise.all([
             this.loadSubjects(),
             this.loadLessons(),
-            this.updateStatistics()
+            this.updateStatistics() // Включаем обновление статистики
         ]);
         this.renderSchedule();
     } catch (error) {
