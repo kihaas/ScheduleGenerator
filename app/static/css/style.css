@@ -1040,3 +1040,72 @@ button {
     text-align: center;
 }
 
+/* Filter styles */
+.filter-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px;
+    background: var(--light);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    border: 1px solid var(--border);
+}
+
+[data-theme="dark"] .filter-item {
+    background: #334155;
+    border-color: #475569;
+}
+
+.filter-info {
+    flex: 1;
+}
+
+.filter-info strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 0.85rem;
+}
+
+.filter-details {
+    font-size: 0.75rem;
+    color: var(--secondary);
+}
+
+.filter-details div {
+    margin-bottom: 2px;
+}
+
+/* Teacher styles */
+.teacher-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px;
+    background: var(--light);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    border: 1px solid var(--border);
+}
+
+[data-theme="dark"] .teacher-item {
+    background: #334155;
+    border-color: #475569;
+}
+
+.teacher-info {
+    flex: 1;
+}
+
+.teacher-info strong {
+    display: block;
+    margin-bottom: 2px;
+    font-size: 0.85rem;
+}
+
+.teacher-meta {
+    font-size: 0.7rem;
+    color: var(--secondary);
+}

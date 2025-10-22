@@ -140,16 +140,17 @@ class ScheduleApp {
     }
 
     async loadInitialData() {
-    try {
-        await Promise.all([
-            this.loadTeachers(),
-            this.loadSubjects(),  // Теперь загружаем предметы из правильного эндпоинта
-            this.loadLessons(),
-            this.loadSavedSchedules(),
-            this.loadFilters()
-        ]);
-    } catch (error) {
-        this.showError('Ошибка загрузки данных: ' + error.message);
+        try {
+            await Promise.all([
+                this.loadTeachers(),
+                this.loadSubjects(),
+                this.loadLessons(),
+                this.loadSavedSchedules(),
+                this.loadFilters()  // Убедиться что эта строка есть
+            ]);
+        } catch (error) {
+            console.error('⚠️ Предупреждение при загрузке данных:', error.message);
+            this.showError('Ошибка загрузки данных: ' + error.message);
     }
 }
 
@@ -204,18 +205,37 @@ class ScheduleApp {
             console.error('Error loading saved schedules:', error);
         }
     }
+    async deleteFilter(teacher) {
+    if (!confirm(`Удалить ограничения для ${teacher}?`)) return;
+
+    try {
+        const response = await fetch(`/api/negative-filters/${encodeURIComponent(teacher)}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            this.showSuccess('Ограничения удалены');
+            await this.loadFilters();
+        } else {
+            const result = await response.json();
+            throw new Error(result.detail || 'Ошибка удаления ограничений');
+        }
+    } catch (error) {
+        this.showError('Ошибка удаления ограничений: ' + error.message);
+    }
+}
 
     async loadFilters() {
-        try {
-            const response = await fetch('/api/lessons');
-            if (response.ok) {
-                // Загружаем фильтры из API если будет endpoint
-                this.renderFiltersList();
-            }
-        } catch (error) {
-            console.error('Error loading filters:', error);
+    try {
+        const response = await fetch('/api/negative-filters');
+        if (response.ok) {
+            this.filters = await response.json();
+            this.renderFiltersList();
         }
+    } catch (error) {
+        console.error('Error loading filters:', error);
     }
+}
 
     populateTeacherSelects() {
         const selects = document.querySelectorAll('select[name="teacher"], #teacherSelect, #filterTeacherSelect, #replaceTeacherSelect');
@@ -231,23 +251,24 @@ class ScheduleApp {
     }
 
     renderTeachersList() {
-        const container = document.getElementById('teachersList');
-        if (!this.teachers.length) {
-            container.innerHTML = '<div class="empty-state">Нет преподавателей</div>';
-            return;
-        }
-
-        container.innerHTML = this.teachers.map(teacher => `
-            <div class="teacher-item" data-id="${teacher.id}">
-                <div class="teacher-info">
-                    <strong>${teacher.name}</strong>
-                </div>
-                <button class="btn-danger btn-small" onclick="app.deleteTeacher(${teacher.id})">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-        `).join('');
+    const container = document.getElementById('teachersList');
+    if (!this.teachers || this.teachers.length === 0) {
+        container.innerHTML = '<div class="empty-state">Нет преподавателей</div>';
+        return;
     }
+
+    container.innerHTML = this.teachers.map(teacher => `
+        <div class="teacher-item" data-id="${teacher.id}">
+            <div class="teacher-info">
+                <strong>${teacher.name}</strong>
+                <div class="teacher-meta">ID: ${teacher.id}</div>
+            </div>
+            <button class="btn-danger btn-small" onclick="app.deleteTeacher(${teacher.id})">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `).join('');
+}
 
     renderSubjectsList() {
     const container = document.getElementById('subjectsList');
@@ -290,6 +311,8 @@ class ScheduleApp {
         `;
     }).join('');
 }
+
+
 
     renderSavedSchedulesList() {
         const container = document.getElementById('savedSchedulesList');
@@ -652,42 +675,62 @@ async generateSchedule() {
 
 
     async addNegativeFilter() {
-        const form = document.getElementById('addFilterForm');
-        const formData = new FormData(form);
+    const form = document.getElementById('addFilterForm');
+    const formData = new FormData(form);
 
-        const restrictedDays = formData.getAll('restricted_days').map(Number);
-        const restrictedSlots = formData.getAll('restricted_slots').map(Number);
+    // Собираем выбранные дни и слоты
+    const restrictedDays = [];
+    const restrictedSlots = [];
 
-        const data = {
-            teacher: formData.get('teacher'),
-            restricted_days: restrictedDays,
-            restricted_slots: restrictedSlots
-        };
+    // Собираем дни
+    const dayCheckboxes = form.querySelectorAll('input[name="restricted_days"]:checked');
+    dayCheckboxes.forEach(checkbox => {
+        restrictedDays.push(parseInt(checkbox.value));
+    });
 
-        try {
-            const response = await fetch('/add-negative-filter', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: new URLSearchParams({
-                    teacher: data.teacher,
-                    restricted_days: data.restricted_days.join(','),
-                    restricted_slots: data.restricted_slots.join(',')
-                })
-            });
+    // Собираем слоты
+    const slotCheckboxes = form.querySelectorAll('input[name="restricted_slots"]:checked');
+    slotCheckboxes.forEach(checkbox => {
+        restrictedSlots.push(parseInt(checkbox.value));
+    });
 
-            if (response.ok) {
-                this.showSuccess('Ограничения сохранены');
-                form.reset();
-                await this.loadFilters();
-            } else {
-                throw new Error(await response.text());
-            }
-        } catch (error) {
-            this.showError('Ошибка сохранения ограничений: ' + error.message);
-        }
+    const data = {
+        teacher: formData.get('teacher'),
+        restricted_days: restrictedDays,
+        restricted_slots: restrictedSlots
+    };
+
+    // Валидация
+    if (!data.teacher) {
+        this.showError('Выберите преподавателя');
+        return;
     }
+
+    this.showLoading();
+
+    try {
+        const response = await fetch('/api/negative-filters', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            this.showSuccess('Ограничения сохранены');
+            form.reset();
+            await this.loadFilters();
+        } else {
+            const result = await response.json();
+            throw new Error(result.detail || 'Ошибка сохранения ограничений');
+        }
+    } catch (error) {
+        this.showError('Ошибка сохранения ограничений: ' + error.message);
+    } finally {
+        this.hideLoading();
+    }
+}
 
     async saveSchedule() {
         const form = document.getElementById('saveScheduleForm');
