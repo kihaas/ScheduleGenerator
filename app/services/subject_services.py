@@ -1,8 +1,10 @@
 import json
-from typing import List, Optional
+from typing import List, Optional, Dict
 from app.db.database import database
 from app.db.models import Subject
 from app.services.teacher_service import teacher_service
+from app.db.models import NegativeFilter
+
 
 
 class SubjectService:
@@ -49,6 +51,37 @@ class SubjectService:
             priority=row[6],
             max_per_day=row[7]
         )
+
+    async def get_negative_filters(self) -> Dict[str, NegativeFilter]:
+        """Получить все ограничения"""
+        import json
+
+        print("🔄 Загрузка ограничений из базы...")
+
+        rows = await database.fetch_all(
+            'SELECT teacher, restricted_days, restricted_slots FROM negative_filters'
+        )
+
+        print(f"📋 Найдено ограничений: {len(rows)}")
+
+        filters = {}
+        for row in rows:
+            teacher, restricted_days_json, restricted_slots_json = row
+            try:
+                restricted_days = json.loads(restricted_days_json) if restricted_days_json else []
+                restricted_slots = json.loads(restricted_slots_json) if restricted_slots_json else []
+            except Exception as e:
+                print(f"❌ Ошибка парсинга ограничений для {teacher}: {e}")
+                restricted_days = []
+                restricted_slots = []
+
+            filters[teacher] = NegativeFilter(
+                teacher=teacher,
+                restricted_days=restricted_days,
+                restricted_slots=restricted_slots
+            )
+
+        return filters
 
     async def create_subject(self, teacher: str, subject_name: str, hours: int,
                              priority: int = 0, max_per_day: int = 2) -> Subject:

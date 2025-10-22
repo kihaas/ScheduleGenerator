@@ -66,10 +66,12 @@ async def read_root(request: Request):
 
         # Безопасное получение фильтров
         try:
-            negative_filters = {
-                teacher: nf.model_dump()
-                for teacher, nf in (await subject_service.get_negative_filters()).items()
-            }
+            negative_filters = await subject_service.get_negative_filters()
+            # УБРАТЬ эту строку - фильтры уже словарь
+            # negative_filters = {
+            #     teacher: nf.model_dump()
+            #     for teacher, nf in (await subject_service.get_negative_filters()).items()
+            # }
         except Exception as e:
             print(f"⚠️ Ошибка загрузки фильтров: {e}")
             negative_filters = {}
@@ -86,7 +88,7 @@ async def read_root(request: Request):
             "request": request,
             "subjects": subjects,
             "teachers": teachers,
-            "negative_filters": negative_filters,
+            "negative_filters": negative_filters,  # Просто передаем словарь
             "schedule_matrix": schedule_matrix,
             "week_days": schedule_service.get_week_days(),
             "time_slots": schedule_service.get_time_slots(),

@@ -64,6 +64,14 @@ class LessonBase(BaseModel):
     teacher: str
     subject_name: str
 
+class NegativeFilter(BaseModel):
+    teacher: str
+    restricted_days: List[int] = []
+    restricted_slots: List[int] = []
+
+    class Config:
+        from_attributes = True
+
 
 class LessonCreate(LessonBase):
     pass
