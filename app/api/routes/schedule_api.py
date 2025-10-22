@@ -70,7 +70,7 @@ async def generate_schedule():
                 "subject_name": lesson.subject_name,
                 "editable": lesson.editable
             }
-            if lesson.id:
+            if hasattr(lesson, 'id') and lesson.id:
                 lesson_dict["id"] = lesson.id
             lessons_data.append(lesson_dict)
 
@@ -81,6 +81,7 @@ async def generate_schedule():
         )
 
     except Exception as e:
+        print(f"❌ Ошибка генерации расписания: {e}")
         raise HTTPException(
             status_code=500,
             detail=f"Ошибка генерации расписания: {str(e)}"

@@ -33,22 +33,28 @@ async def create_teacher(request: TeacherCreateRequest):
         raise HTTPException(status_code=400, detail=f"Ошибка создания преподавателя: {str(e)}")
 
 
-@router.get("/api/teachers", response_model=List[TeacherResponse])
-async def get_teachers():
-    """Получить всех преподавателей"""
+@router.post("/api/teachers", response_model=TeacherResponse)
+async def create_teacher(request: TeacherCreateRequest):
+    """Создать преподавателя с проверкой уникальности"""
     try:
-        teachers = await teacher_service.get_all_teachers()
-        return [
-            TeacherResponse(
-                id=teacher.id,
-                name=teacher.name,
-                created_at=teacher.created_at.isoformat()
+        # Проверяем существование преподавателя
+        existing = await teacher_service.get_teacher_by_name(request.name)
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail="Преподаватель с таким именем уже существует"
             )
-            for teacher in teachers
-        ]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения преподавателей: {str(e)}")
 
+        teacher = await teacher_service.create_teacher(request.name)
+        return TeacherResponse(
+            id=teacher.id,
+            name=teacher.name,
+            created_at=teacher.created_at.isoformat()
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Ошибка создания преподавателя: {str(e)}")
 
 @router.put("/api/teachers/{teacher_id}")
 async def update_teacher(teacher_id: int, request: TeacherCreateRequest):

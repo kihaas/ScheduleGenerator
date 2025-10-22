@@ -56,6 +56,18 @@ class TeacherService:
 
         return Teacher(id=row[0], name=row[1], created_at=row[2])
 
+    async def get_teacher_by_name(self, name: str) -> Optional[Teacher]:
+        """Найти преподавателя по имени"""
+        row = await database.fetch_one(
+            'SELECT id, name, created_at FROM teachers WHERE name = ?',
+            (name,)
+        )
+
+        if not row:
+            return None
+
+        return Teacher(id=row[0], name=row[1], created_at=row[2])
+
     async def delete_teacher(self, teacher_id: int) -> bool:
         """Удалить преподавателя со всеми связанными данными"""
         try:

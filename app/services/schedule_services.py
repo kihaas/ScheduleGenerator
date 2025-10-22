@@ -36,11 +36,14 @@ class ScheduleService:
             )
 
     async def generate_schedule(self) -> List[Lesson]:
-        """Генерация расписания"""
+        """Генерация расписания с учетом ограничений"""
         print("🔄 Начинаем генерацию расписания...")
 
         subjects = await subject_service.get_all_subjects()
+        negative_filters = await subject_service.get_negative_filters()
+
         print(f"📚 Найдено предметов: {len(subjects)}")
+        print(f"🚫 Найдено ограничений: {len(negative_filters)}")
 
         if not subjects:
             print("❌ Нет предметов для генерации")
@@ -59,7 +62,7 @@ class ScheduleService:
         # Перезагружаем предметы с обновленными данными
         subjects = await subject_service.get_all_subjects()
 
-        # Создаем уроки
+        # Создаем уроки с учетом ограничений
         lessons = []
         subject_index = 0
 
@@ -68,16 +71,25 @@ class ScheduleService:
                 if not subjects:
                     break
 
-                # Ищем предмет с оставшимися парами
+                # Ищем предмет с оставшимися парами, учитывая ограничения
                 subject_found = None
                 for i in range(len(subjects)):
                     subject = subjects[(subject_index + i) % len(subjects)]
+
+                    # Проверяем ограничения для преподавателя
+                    if subject.teacher in negative_filters:
+                        restrictions = negative_filters[subject.teacher]
+                        if (day in restrictions.get('restricted_days', []) or
+                                time_slot in restrictions.get('restricted_slots', [])):
+                            print(f"🚫 Пропускаем {subject.teacher} - ограничения для дня {day}, слота {time_slot}")
+                            continue
+
                     if subject.remaining_pairs > 0:
                         subject_found = subject
                         break
 
                 if not subject_found:
-                    break
+                    continue
 
                 lesson = Lesson(
                     day=day,
@@ -188,15 +200,16 @@ class ScheduleService:
             scheduled_pairs = len(lessons)
             remaining_pairs = sum(s.remaining_pairs for s in subjects)
 
-            print(f"📊 Статистика: {len(subjects)} предметов, {total_hours}ч всего, {remaining_hours}ч осталось")
+            print(
+                f"📊 Статистика: {len(subjects)} предметов, {len(teachers)} преподавателей, {scheduled_pairs} пар, {remaining_hours}ч осталось")
 
             return {
                 'total_subjects': len(subjects),
-                'total_teachers': len(teachers),  # Оставляем для совместимости
+                'total_teachers': len(teachers),
                 'total_hours': total_hours,
                 'remaining_hours': remaining_hours,
-                'scheduled_pairs': scheduled_pairs,  # Оставляем для совместимости
-                'remaining_pairs': remaining_pairs  # Оставляем для совместимости
+                'scheduled_pairs': scheduled_pairs,
+                'remaining_pairs': remaining_pairs
             }
         except Exception as e:
             print(f"❌ Ошибка в статистике: {e}")
