@@ -1,45 +1,20 @@
-from fastapi import APIRouter, HTTPException, Query, Body
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any
 from pydantic import BaseModel, Field
 from datetime import datetime
 import json
 
 from app.services.schedule_services import schedule_service
-from app.services.subject_services import subject_service
 from app.db.database import database
-from app.db.models import Lesson
 
 router = APIRouter(tags=["schedule-api"])
 
 
-# Pydantic модели для валидации
 class GenerateScheduleResponse(BaseModel):
     success: bool
     lessons: List[Dict[str, Any]]
     message: str = "Расписание успешно сгенерировано"
-
-
-class LessonResponse(BaseModel):
-    id: Optional[int]
-    day: int
-    time_slot: int
-    teacher: str
-    subject_name: str
-    editable: bool = True
-    is_past: bool = False
-
-
-class RemoveLessonRequest(BaseModel):
-    day: int = Field(..., ge=0, le=6, description="Day of week (0-6)")
-    time_slot: int = Field(..., ge=0, le=3, description="Time slot (0-3)")
-
-
-class UpdateLessonRequest(BaseModel):
-    day: int = Field(..., ge=0, le=6, description="Day of week (0-6)")
-    time_slot: int = Field(..., ge=0, le=3, description="Time slot (0-3)")
-    new_teacher: str = Field(..., min_length=1, max_length=100, description="New teacher name")
-    new_subject_name: str = Field(..., min_length=1, max_length=100, description="New subject name")
 
 
 class SaveScheduleRequest(BaseModel):
@@ -85,80 +60,6 @@ async def generate_schedule():
         raise HTTPException(
             status_code=500,
             detail=f"Ошибка генерации расписания: {str(e)}"
-        )
-
-
-@router.get("/api/lessons", response_model=List[LessonResponse])
-async def get_all_lessons():
-    """Получить все уроки"""
-    try:
-        lessons = await schedule_service.get_all_lessons()
-        return lessons
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка получения уроков: {str(e)}"
-        )
-
-
-@router.delete("/api/lessons")
-async def remove_lesson(
-        day: int = Query(..., ge=0, le=6, description="Day of week (0-6)"),
-        time_slot: int = Query(..., ge=0, le=3, description="Time slot (0-3)")
-):
-    """Удалить урок по дню и временному слоту"""
-    try:
-        success = await schedule_service.remove_lesson(day, time_slot)
-
-        if not success:
-            raise HTTPException(
-                status_code=404,
-                detail="Урок не найден или не может быть удален"
-            )
-
-        return JSONResponse(
-            status_code=200,
-            content={"success": True, "message": "Урок успешно удален"}
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка удаления урока: {str(e)}"
-        )
-
-
-@router.patch("/api/lessons")
-async def update_lesson(request: UpdateLessonRequest):
-    """Обновить урок"""
-    try:
-        success = await schedule_service.update_lesson(
-            request.day,
-            request.time_slot,
-            request.new_teacher,
-            request.new_subject_name
-        )
-
-        if not success:
-            raise HTTPException(
-                status_code=400,
-                detail="Не удалось обновить урок (возможно, урок не редактируемый или не найден)"
-            )
-
-        return JSONResponse(
-            status_code=200,
-            content={"success": True, "message": "Урок успешно обновлен"}
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка обновления урока: {str(e)}"
         )
 
 

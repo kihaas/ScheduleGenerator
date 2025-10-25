@@ -1109,3 +1109,43 @@ button {
     font-size: 0.7rem;
     color: var(--secondary);
 }
+
+/* Selected subject info styles */
+.selected-subject-info {
+    background: var(--light);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    margin-top: 10px;
+    font-size: 0.85rem;
+}
+
+.selected-subject-info div {
+    margin-bottom: 4px;
+}
+
+.selected-subject-info strong {
+    color: var(--primary);
+}
+
+[data-theme="dark"] .selected-subject-info {
+    background: #334155;
+    border-color: #475569;
+}
+
+/* Improve select styling */
+#replaceSubjectSelect {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: white;
+    color: var(--dark);
+    font-size: 0.85rem;
+}
+
+[data-theme="dark"] #replaceSubjectSelect {
+    background: #334155;
+    border-color: #475569;
+    color: white;
+}

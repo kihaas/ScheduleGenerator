@@ -155,38 +155,67 @@ class ScheduleService:
         return True
 
     async def update_lesson(self, day: int, time_slot: int, new_teacher: str, new_subject_name: str) -> bool:
-        """Обновить урок"""
+        """Обновить урок - заменить на существующий предмет"""
+        # Получаем текущий урок
         current_lesson = await database.fetch_one(
             'SELECT teacher, subject_name, editable FROM lessons WHERE day = ? AND time_slot = ?',
             (day, time_slot)
         )
 
-        if not current_lesson or not current_lesson[2]:
+        if not current_lesson or not current_lesson[2]:  # editable check
             return False
 
         old_teacher, old_subject_name, _ = current_lesson
 
-        # Обновляем пары
-        await database.execute('''
-            UPDATE subjects 
-            SET remaining_pairs = remaining_pairs + 1,
-                remaining_hours = remaining_hours + 2
-            WHERE teacher = ? AND subject_name = ?
-        ''', (old_teacher, old_subject_name))
-
-        await database.execute('''
-            UPDATE subjects 
-            SET remaining_pairs = remaining_pairs - 1,
-                remaining_hours = remaining_hours - 2
-            WHERE teacher = ? AND subject_name = ?
-        ''', (new_teacher, new_subject_name))
-
-        await database.execute(
-            'UPDATE lessons SET teacher = ?, subject_name = ? WHERE day = ? AND time_slot = ?',
-            (new_teacher, new_subject_name, day, time_slot)
+        # Проверяем существование нового предмета
+        new_subject = await database.fetch_one(
+            'SELECT id, remaining_pairs FROM subjects WHERE teacher = ? AND subject_name = ?',
+            (new_teacher, new_subject_name)
         )
 
-        return True
+        if not new_subject:
+            print(f"❌ Предмет не найден: {new_teacher} - {new_subject_name}")
+            return False
+
+        if new_subject[1] <= 0:  # remaining_pairs check
+            print(f"❌ Не осталось пар у предмета: {new_teacher} - {new_subject_name}")
+            return False
+
+        # Если заменяем на тот же предмет - ничего не делаем
+        if old_teacher == new_teacher and old_subject_name == new_subject_name:
+            print("ℹ️ Замена на тот же предмет - пропускаем")
+            return True
+
+        # Начинаем транзакцию
+        try:
+            # Возвращаем пару старому предмету
+            await database.execute('''
+                UPDATE subjects 
+                SET remaining_pairs = remaining_pairs + 1,
+                    remaining_hours = remaining_hours + 2
+                WHERE teacher = ? AND subject_name = ?
+            ''', (old_teacher, old_subject_name))
+
+            # Забираем пару у нового предмета
+            await database.execute('''
+                UPDATE subjects 
+                SET remaining_pairs = remaining_pairs - 1,
+                    remaining_hours = remaining_hours - 2
+                WHERE teacher = ? AND subject_name = ?
+            ''', (new_teacher, new_subject_name))
+
+            # Обновляем урок
+            await database.execute(
+                'UPDATE lessons SET teacher = ?, subject_name = ? WHERE day = ? AND time_slot = ?',
+                (new_teacher, new_subject_name, day, time_slot)
+            )
+
+            print(f"✅ Замена: {old_teacher} - {old_subject_name} → {new_teacher} - {new_subject_name}")
+            return True
+
+        except Exception as e:
+            print(f"❌ Ошибка при замене урока: {e}")
+            return False
 
     async def get_statistics(self) -> Dict[str, int]:
         """Получить статистику"""

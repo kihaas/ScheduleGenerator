@@ -479,45 +479,109 @@ class ScheduleApp {
     }
 
     showReplaceModal() {
-        const modal = document.getElementById('replaceModal');
-        document.getElementById('replaceDay').value = this.currentLesson.day;
-        document.getElementById('replaceTimeSlot').value = this.currentLesson.time_slot;
-        modal.style.display = 'block';
+    const modal = document.getElementById('replaceModal');
+    document.getElementById('replaceDay').value = this.currentLesson.day;
+    document.getElementById('replaceTimeSlot').value = this.currentLesson.time_slot;
+
+    // Заполняем выпадающий список предметами
+    this.populateSubjectSelect();
+
+    modal.style.display = 'block';
+}
+
+updateSelectedSubjectInfo(select) {
+    const infoDiv = document.getElementById('selectedSubjectInfo');
+    const selectedOption = select.options[select.selectedIndex];
+
+    if (selectedOption.value) {
+        document.getElementById('infoTeacher').textContent = selectedOption.dataset.teacher;
+        document.getElementById('infoHours').textContent = selectedOption.dataset.totalHours;
+        document.getElementById('infoRemainingPairs').textContent = selectedOption.dataset.remainingPairs;
+        infoDiv.style.display = 'block';
+    } else {
+        infoDiv.style.display = 'none';
     }
+}
+
+
+populateSubjectSelect() {
+    const select = document.getElementById('replaceSubjectSelect');
+    select.innerHTML = '<option value="">Выберите предмет из списка</option>';
+
+    this.subjects.forEach(subject => {
+        if (subject.remaining_pairs > 0) { // Показываем только предметы с оставшимися парами
+            const option = document.createElement('option');
+            option.value = subject.id;
+            option.textContent = `${subject.teacher} - ${subject.subject_name} (${subject.remaining_pairs} пар осталось)`;
+            option.dataset.teacher = subject.teacher;
+            option.dataset.subjectName = subject.subject_name;
+            option.dataset.remainingPairs = subject.remaining_pairs;
+            option.dataset.totalHours = subject.total_hours;
+            select.appendChild(option);
+        }
+    });
+
+    // Добавляем обработчик изменения выбора
+    select.addEventListener('change', (e) => {
+        this.updateSelectedSubjectInfo(e.target);
+    });
+}
+
+
+
 
     async replaceLesson() {
-        const form = document.getElementById('replaceForm');
-        const formData = new FormData(form);
+    const form = document.getElementById('replaceForm');
+    const subjectId = form.subject_id.value;
 
-        const data = {
-            day: parseInt(formData.get('day')),
-            time_slot: parseInt(formData.get('time_slot')),
-            new_teacher: formData.get('new_teacher'),
-            new_subject_name: formData.get('new_subject_name')
-        };
-
-        try {
-            const response = await fetch('/api/lessons', {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data)
-            });
-
-            if (response.ok) {
-                this.showSuccess('Пара заменена');
-                document.getElementById('replaceModal').style.display = 'none';
-                form.reset();
-                await this.loadLessons();
-                await this.updateStatistics();
-            } else {
-                throw new Error(await response.text());
-            }
-        } catch (error) {
-            this.showError('Ошибка замены: ' + error.message);
-        }
+    if (!subjectId) {
+        this.showError('Выберите предмет для замены');
+        return;
     }
+
+    // Находим выбранный предмет
+    const selectedSubject = this.subjects.find(s => s.id == subjectId);
+    if (!selectedSubject) {
+        this.showError('Выбранный предмет не найден');
+        return;
+    }
+
+    const data = {
+        day: parseInt(form.day.value),
+        time_slot: parseInt(form.time_slot.value),
+        new_teacher: selectedSubject.teacher,
+        new_subject_name: selectedSubject.subject_name
+    };
+
+    this.showLoading();
+
+    try {
+        const response = await fetch('/api/lessons', {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            this.showSuccess('Пара заменена');
+            document.getElementById('replaceModal').style.display = 'none';
+            form.reset();
+            document.getElementById('selectedSubjectInfo').style.display = 'none';
+
+            // Обновляем данные
+            await this.refreshAllData();
+        } else {
+            const result = await response.json();
+            throw new Error(result.detail || 'Ошибка замены пары');
+        }
+    } catch (error) {
+        this.showError('Ошибка замены: ' + error.message);
+    } finally {
+        this.hideLoading();
+    }
+}
 
     async addTeacher() {
         const form = document.getElementById('addTeacherForm');
