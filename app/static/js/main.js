@@ -227,10 +227,15 @@ class ScheduleApp {
 
     async loadFilters() {
     try {
+        console.log("🔄 Загрузка ограничений...");
         const response = await fetch('/api/negative-filters');
+
         if (response.ok) {
             this.filters = await response.json();
+            console.log("✅ Ограничения загружены:", this.filters);
             this.renderFiltersList();
+        } else {
+            console.error("❌ Ошибка загрузки ограничений:", response.status);
         }
     } catch (error) {
         console.error('Error loading filters:', error);
@@ -343,75 +348,109 @@ class ScheduleApp {
     }
 
     renderFiltersList() {
-        const container = document.getElementById('filtersList');
-        // Заглушка для фильтров
-        container.innerHTML = '<div class="empty-state">Ограничения появятся здесь после сохранения</div>';
+    const container = document.getElementById('filtersList');
+
+    if (!this.filters || Object.keys(this.filters).length === 0) {
+        container.innerHTML = '<div class="empty-state">Нет сохраненных ограничений</div>';
+        return;
     }
+
+    console.log("🎯 Рендерим ограничения:", this.filters);
+
+    container.innerHTML = Object.entries(this.filters).map(([teacher, filter]) => {
+        // Преобразуем дни в читаемый формат
+        const daysMap = {0: 'Пн', 1: 'Вт', 2: 'Ср', 3: 'Чт', 4: 'Пт'};
+        const daysText = filter.restricted_days && filter.restricted_days.length > 0
+            ? filter.restricted_days.map(d => daysMap[d] || d).join(', ')
+            : 'нет';
+
+        // Преобразуем слоты в читаемый формат (1,2,3,4 вместо 0,1,2,3)
+        const slotsText = filter.restricted_slots && filter.restricted_slots.length > 0
+            ? filter.restricted_slots.map(s => parseInt(s) + 1).join(', ')
+            : 'нет';
+
+        return `
+            <div class="filter-item">
+                <div class="filter-info">
+                    <strong>${teacher}</strong>
+                    <div class="filter-details">
+                        <div><i class="fas fa-calendar-times"></i> Запрещенные дни: ${daysText}</div>
+                        <div><i class="fas fa-clock"></i> Запрещенные пары: ${slotsText}</div>
+                    </div>
+                </div>
+                <button class="btn-danger btn-small" onclick="app.deleteFilter('${teacher}')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+    }).join('');
+}
 
     renderSchedule() {
-        const scheduleGrid = document.getElementById('scheduleGrid');
-        const weekDays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
-        const timeSlots = [
-            { start: '9:00', end: '10:30' },
-            { start: '10:40', end: '12:10' },
-            { start: '12:40', end: '14:10' },
-            { start: '14:20', end: '15:50' }
-        ];
+    const scheduleGrid = document.getElementById('scheduleGrid');
+    const weekDays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+    const timeSlots = [
+        { start: '9:00', end: '10:30' },
+        { start: '10:40', end: '12:10' },
+        { start: '12:40', end: '14:10' },
+        { start: '14:20', end: '15:50' }
+    ];
 
-        let html = '';
+    let html = '';
 
-        // Header row
-        html += '<div class="schedule-header"></div>';
-        weekDays.forEach((day, index) => {
-            const isWeekend = index >= 5;
-            html += `<div class="schedule-header ${isWeekend ? 'weekend' : ''}">${day}<br><small>${['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][index]}</small></div>`;
-        });
+    // Header row - ТОЛЬКО полные названия дней
+    html += '<div class="schedule-header"></div>'; // Пустая ячейка для временных слотов
+    weekDays.forEach((day, index) => {
+        const isWeekend = index >= 5;
+        // УБИРАЕМ <br><small>${['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][index]}</small>
+        html += `<div class="schedule-header ${isWeekend ? 'weekend' : ''}">${day}</div>`;
+    });
 
-        // Time slots and lessons
-        timeSlots.forEach((slot, slotIndex) => {
-            html += `<div class="time-slot">${slot.start}<br>${slot.end}<div class="time-slot-number">${slotIndex + 1}</div></div>`;
+    // Time slots and lessons
+    timeSlots.forEach((slot, slotIndex) => {
+        html += `<div class="time-slot">${slot.start}<br>${slot.end}<div class="time-slot-number">${slotIndex + 1}</div></div>`;
 
-            for (let day = 0; day < 7; day++) {
-                const lesson = this.lessons.find(l => l.day === day && l.time_slot === slotIndex);
-                const isWeekend = day >= 5;
+        for (let day = 0; day < 7; day++) {
+            const lesson = this.lessons.find(l => l.day === day && l.time_slot === slotIndex);
+            const isWeekend = day >= 5;
 
-                html += `<div class="schedule-cell ${isWeekend ? 'weekend' : ''}" data-day="${day}" data-slot="${slotIndex}">`;
+            html += `<div class="schedule-cell ${isWeekend ? 'weekend' : ''}" data-day="${day}" data-slot="${slotIndex}">`;
 
-                if (lesson) {
-                    html += `
-                        <div class="lesson-card">
-                            <div class="lesson-content">
-                                <strong>${lesson.subject_name}</strong>
-                                <div class="lesson-teacher">${lesson.teacher}</div>
-                            </div>
+            if (lesson) {
+                html += `
+                    <div class="lesson-card">
+                        <div class="lesson-content">
+                            <strong>${lesson.subject_name}</strong>
+                            <div class="lesson-teacher">${lesson.teacher}</div>
                         </div>
-                    `;
-                } else {
-                    html += `<div class="empty-slot"><i class="fas fa-plus"></i><span>Свободно</span></div>`;
-                }
-
-                html += '</div>';
+                    </div>
+                `;
+            } else {
+                html += `<div class="empty-slot"><i class="fas fa-plus"></i><span>Свободно</span></div>`;
             }
 
-            // Lunch break after second slot
-            if (slotIndex === 1) {
-                html += `<div class="lunch-break" style="grid-column: 1 / span 8;">
-                    <i class="fas fa-utensils"></i> Обеденный перерыв
-                </div>`;
+            html += '</div>';
+        }
+
+        // Lunch break after second slot
+        if (slotIndex === 1) {
+            html += `<div class="lunch-break" style="grid-column: 1 / span 8;">
+                <i class="fas fa-utensils"></i> Обеденный перерыв
+            </div>`;
+        }
+    });
+
+    scheduleGrid.innerHTML = html;
+
+    // Add click handlers for lessons
+    scheduleGrid.querySelectorAll('.schedule-cell').forEach(cell => {
+        cell.addEventListener('click', (e) => {
+            if (e.target.closest('.lesson-card')) {
+                this.handleLessonClick(cell);
             }
         });
-
-        scheduleGrid.innerHTML = html;
-
-        // Add click handlers for lessons
-        scheduleGrid.querySelectorAll('.schedule-cell').forEach(cell => {
-            cell.addEventListener('click', (e) => {
-                if (e.target.closest('.lesson-card')) {
-                    this.handleLessonClick(cell);
-                }
-            });
-        });
-    }
+    });
+}
 
     handleLessonClick(cell) {
         // Можно добавить функциональность при клике на пару
@@ -770,6 +809,12 @@ async generateSchedule() {
         return;
     }
 
+    // Проверяем что выбраны ограничения
+    if (restrictedDays.length === 0 && restrictedSlots.length === 0) {
+        this.showError('Выберите хотя бы один день или пару для ограничения');
+        return;
+    }
+
     this.showLoading();
 
     try {
@@ -784,7 +829,14 @@ async generateSchedule() {
         if (response.ok) {
             this.showSuccess('Ограничения сохранены');
             form.reset();
+
+            // Перезагружаем и автоматически раскрываем секцию ограничений
             await this.loadFilters();
+
+            // Автоматически раскрываем секцию ограничений чтобы увидеть результат
+            const filtersSection = document.querySelector('[data-section="filters"]').parentElement;
+            filtersSection.classList.add('active');
+
         } else {
             const result = await response.json();
             throw new Error(result.detail || 'Ошибка сохранения ограничений');
