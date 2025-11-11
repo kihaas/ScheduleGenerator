@@ -159,13 +159,14 @@ PUT /api/teachers/{id} - редактировать преподавателя
 
 
 
-<img width="1248" height="698" alt="image" src="https://github.com/user-attachments/assets/8bbeaceb-6c64-4b59-9ad9-ee1e2c94c2b9" />
 
 <img width="1906" height="940" alt="image" src="https://github.com/user-attachments/assets/7c9bfc3c-8737-45e3-9f67-5be82c4101d1" />
 
 <img width="1915" height="941" alt="image" src="https://github.com/user-attachments/assets/a6499633-e66b-4037-a77e-bfc09b79c848" />
 
 <img width="1209" height="972" alt="image" src="https://github.com/user-attachments/assets/904e48e5-f9b7-42f7-9926-410d0b264258" />
+
+<img width="1248" height="698" alt="image" src="https://github.com/user-attachments/assets/8bbeaceb-6c64-4b59-9ad9-ee1e2c94c2b9" />
 
 <img width="273" height="177" alt="image" src="https://github.com/user-attachments/assets/fc348afd-37aa-426d-a76a-b9daf3879d6a" />
 
