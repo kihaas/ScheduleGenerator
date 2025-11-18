@@ -1,7 +1,0 @@
-/* Главный файл стилей - только импорты */
-@import url('modules/variables.css');
-@import url('modules/base.css');
-@import url('modules/layout.css');
-@import url('modules/components.css');
-@import url('modules/schedule.css');
-@import url('modules/responsive.css');
