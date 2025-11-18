@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎓 Генератор расписания</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1><i class="fas fa-graduation-cap"></i> Расписание</h1>
+                <button class="sidebar-toggle" id="sidebarToggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+
+            <nav class="sidebar-nav">
+                <!-- Статистика -->
+                <div class="nav-section">
+                    <div class="nav-section-header" data-section="statistics">
+                        <i class="fas fa-chart-pie"></i>
+                        <span>Статистика</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="nav-section-content" id="statisticsContent">
+                        <div class="stats-cards">
+                            <div class="stat-card">
+                                <div class="stat-value" id="statSubjects">0</div>
+                                <div class="stat-label">Предметы</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="statTotalHours">0</div>
+                                <div class="stat-label">Всего часов</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="statRemainingHours">0</div>
+                                <div class="stat-label">Осталось часов</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Преподаватели -->
+                <div class="nav-section">
+                    <div class="nav-section-header" data-section="teachers">
+                        <i class="fas fa-user-tie"></i>
+                        <span>Преподаватели</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="nav-section-content" id="teachersContent">
+                        <form class="compact-form" id="addTeacherForm">
+                            <div class="form-group">
+                                <label>ФИО преподавателя:</label>
+                                <input type="text" name="name" placeholder="Иванов И.И." required>
+                            </div>
+                            <button type="submit" class="btn-primary btn-small">
+                                <i class="fas fa-plus"></i> Добавить преподавателя
+                            </button>
+                        </form>
+
+                        <div class="teachers-list compact-list" id="teachersList">
+                            <!-- Список преподавателей будет здесь -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Предметы -->
+                <div class="nav-section">
+                    <div class="nav-section-header" data-section="subjects">
+                        <i class="fas fa-book"></i>
+                        <span>Предметы</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="nav-section-content" id="subjectsContent">
+                        <form class="compact-form" id="addSubjectForm">
+                            <div class="form-group">
+                                <label>Преподаватель:</label>
+                                <select name="teacher" id="teacherSelect" required>
+                                    <option value="">Выберите преподавателя</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Предмет:</label>
+                                <input type="text" name="subject_name" placeholder="Название предмета" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Часы:</label>
+                                <input type="number" name="hours" value="4" min="2" step="2" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Приоритет:</label>
+                                <input type="number" name="priority" value="0" min="0" max="10">
+                            </div>
+                            <div class="form-group">
+                                <label>Макс. в день:</label>
+                                <input type="number" name="max_per_day" value="2" min="1" max="4">
+                            </div>
+                            <button type="submit" class="btn-primary btn-small">
+                                <i class="fas fa-plus"></i> Добавить предмет
+                            </button>
+                        </form>
+
+                        <div class="subjects-list compact-list" id="subjectsList">
+                            <!-- Список предметов будет здесь -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ограничения -->
+                <div class="nav-section">
+                    <div class="nav-section-header" data-section="filters">
+                        <i class="fas fa-ban"></i>
+                        <span>Ограничения</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="nav-section-content" id="filtersContent">
+                        <form class="compact-form" id="addFilterForm">
+                            <div class="form-group">
+                                <label>Преподаватель:</label>
+                                <select name="teacher" id="filterTeacherSelect" required>
+                                    <option value="">Выберите преподавателя</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Запрещенные дни:</label>
+                                <div class="checkbox-grid">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="restricted_days" value="0">
+                                        <span class="day-badge">Пн</span>
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="restricted_days" value="1">
+                                        <span class="day-badge">Вт</span>
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="restricted_days" value="2">
+                                        <span class="day-badge">Ср</span>
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="restricted_days" value="3">
+                                        <span class="day-badge">Чт</span>
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="restricted_days" value="4">
+                                        <span class="day-badge">Пт</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Запрещенные пары:</label>
+                                <div class="checkbox-grid">
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="restricted_slots" value="0">
+                                        <span class="slot-badge">1</span>
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="restricted_slots" value="1">
+                                        <span class="slot-badge">2</span>
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="restricted_slots" value="2">
+                                        <span class="slot-badge">3</span>
+                                    </label>
+                                    <label class="checkbox-label">
+                                        <input type="checkbox" name="restricted_slots" value="3">
+                                        <span class="slot-badge">4</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-secondary btn-small">
+                                <i class="fas fa-save"></i> Сохранить ограничения
+                            </button>
+                        </form>
+
+                        <div class="filters-list compact-list" id="filtersList">
+                            <!-- Список ограничений будет здесь -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Сохраненные расписания -->
+                <div class="nav-section">
+                    <div class="nav-section-header" data-section="saved">
+                        <i class="fas fa-history"></i>
+                        <span>Сохраненные</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="nav-section-content" id="savedContent">
+                        <form class="compact-form" id="saveScheduleForm">
+                            <div class="form-group">
+                                <label>Название расписания:</label>
+                                <input type="text" name="name" placeholder="Расписание на сентябрь" required>
+                            </div>
+                            <button type="submit" class="btn-success btn-small">
+                                <i class="fas fa-save"></i> Сохранить текущее
+                            </button>
+                        </form>
+
+                        <div class="saved-schedules-list compact-list" id="savedSchedulesList">
+                            <!-- Список сохраненных расписаний -->
+                        </div>
+                    </div>
+                </div>
+
+<!-- Управление -->
+<div class="nav-section">
+    <div class="nav-section-header" data-section="management">
+        <i class="fas fa-cog"></i>
+        <span>Управление</span>
+        <i class="fas fa-chevron-down"></i>
+    </div>
+    <div class="nav-section-content" id="managementContent">
+        <button class="btn-generate" id="generateSchedule">
+            <i class="fas fa-magic"></i> Сгенерировать расписание
+        </button>
+        <!-- Временная кнопка для отладки -->
+        <button class="btn-secondary btn-small" onclick="app.debugSubjects()" style="margin-top: 10px;">
+            <i class="fas fa-bug"></i> Отладка предметов
+        </button>
+        <button class="btn-danger btn-small" id="clearAll">
+            <i class="fas fa-trash"></i> Очистить всё
+        </button>
+    </div>
+</div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="content-header">
+                <div class="header-title">
+                    <h2>Расписание занятий</h2>
+                    <p>Недельное расписание с автоматической генерацией</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn-primary" id="fullGenerate">
+                        <i class="fas fa-bolt"></i> Быстрая генерация
+                    </button>
+                </div>
+            </header>
+
+            <!-- Schedule -->
+            <div class="schedule-container">
+                <div class="schedule" id="scheduleGrid">
+                    <!-- Расписание будет здесь -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Context Menu -->
+    <div class="context-menu" id="contextMenu">
+        <div class="context-item" data-action="delete">
+            <i class="fas fa-trash"></i> Удалить пару
+        </div>
+        <div class="context-item" data-action="replace">
+            <i class="fas fa-exchange-alt"></i> Заменить предмет
+        </div>
+    </div>
+
+    <!-- Replace Lesson Modal -->
+<div class="modal" id="replaceModal">
+    <div class="modal-content compact-modal">
+        <div class="modal-header">
+            <h3>Заменить предмет</h3>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="replaceForm">
+                <div class="form-group">
+                    <label>Текущий слот:</label>
+                    <div id="currentSlotInfo" style="padding: 8px; background: var(--light); border-radius: 4px; font-size: 0.9rem;">
+                        <!-- Здесь будет информация о текущем слоте -->
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Выберите существующий предмет:</label>
+                    <select name="existing_subject" id="existingSubjectsSelect" required>
+                        <option value="">Выберите предмет из списка</option>
+                    </select>
+                </div>
+                <div class="form-group" style="display: none;" id="selectedSubjectInfo">
+                    <label>Выбранный предмет:</label>
+                    <div id="subjectDetails" style="padding: 8px; background: var(--success); color: white; border-radius: 4px; font-size: 0.9rem;">
+                        <!-- Детали выбранного предмета -->
+                    </div>
+                </div>
+                <input type="hidden" name="day" id="replaceDay">
+                <input type="hidden" name="time_slot" id="replaceTimeSlot">
+                <input type="hidden" name="new_teacher" id="replaceTeacher">
+                <input type="hidden" name="new_subject_name" id="replaceSubjectName">
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" id="cancelReplace">Отмена</button>
+            <button class="btn-primary" id="confirmReplace" disabled>Заменить</button>
+        </div>
+    </div>
+</div>
+
+    <!-- Save Schedule Modal -->
+    <div class="modal" id="saveModal">
+        <div class="modal-content compact-modal">
+            <div class="modal-header">
+                <h3>Сохранить расписание</h3>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="saveForm">
+                    <div class="form-group">
+                        <label>Название расписания:</label>
+                        <input type="text" name="name" placeholder="Расписание на сентябрь" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="cancelSave">Отмена</button>
+                <button class="btn-primary" id="confirmSave">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div class="loading-spinner" id="loadingSpinner">
+        <div class="spinner"></div>
+        <p>Генерация расписания...</p>
+    </div>
+
+    <!-- Theme Toggle -->
+    <button class="theme-toggle" id="themeToggle">
+        <i class="fas fa-moon"></i>
+    </button>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
