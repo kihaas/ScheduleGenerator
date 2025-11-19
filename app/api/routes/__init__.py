@@ -1,0 +1,13 @@
+from fastapi import APIRouter
+from . import schedule, subjects, lessons, teachers, negative_filters, statistics, schedule_api
+
+api_router = APIRouter()
+
+api_router.include_router(schedule.router)
+api_router.include_router(subjects.router)
+api_router.include_router(lessons.router)
+api_router.include_router(teachers.router)
+api_router.include_router(statistics.router)
+api_router.include_router(negative_filters.router)
+
+api_router.include_router(schedule_api.router)
