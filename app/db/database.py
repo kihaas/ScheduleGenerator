@@ -152,7 +152,6 @@ class Database:
                 await conn.execute('CREATE INDEX idx_subjects_teacher ON subjects(teacher)')
                 await conn.execute('CREATE INDEX idx_lessons_day_time ON lessons(day, time_slot)')
                 await conn.execute('CREATE INDEX idx_teachers_name ON teachers(name)')
-                await conn.execute('CREATE INDEX idx_users_email ON users(email)')
 
                 await conn.commit()
                 print("✅ База данных создана с полной структурой")
