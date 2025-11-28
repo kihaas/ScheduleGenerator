@@ -4,22 +4,6 @@ from datetime import datetime
 import json
 
 
-class UserBase(BaseModel):
-    email: EmailStr
-    name: str
-
-
-class UserCreate(UserBase):
-    password: str
-
-
-class User(UserBase):
-    id: int
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
 
 class TeacherBase(BaseModel):
     name: str

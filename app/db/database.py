@@ -137,17 +137,6 @@ class Database:
                     )
                 ''')
 
-                # Таблица пользователей
-                await conn.execute('''
-                    CREATE TABLE users (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        email TEXT NOT NULL UNIQUE,
-                        name TEXT NOT NULL,
-                        password_hash TEXT NOT NULL,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                ''')
-
                 # Таблица сохраненных расписаний
                 await conn.execute('''
                     CREATE TABLE saved_schedules (
