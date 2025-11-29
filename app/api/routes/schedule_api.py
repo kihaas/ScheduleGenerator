@@ -1,10 +1,13 @@
 from fastapi import APIRouter, HTTPException, Query, Body
+from fastapi.openapi.models import Response
 from fastapi.responses import JSONResponse
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from datetime import datetime
 import json
 
+from app.api.routes import lessons
+from app.services.exel_exporter import ExcelExporter
 from app.services.schedule_services import schedule_service
 from app.services.subject_services import subject_service
 from app.db.database import database
@@ -100,7 +103,6 @@ async def get_all_lessons():
             status_code=500,
             detail=f"Ошибка получения уроков: {str(e)}"
         )
-
 
 @router.delete("/api/lessons")
 async def remove_lesson(

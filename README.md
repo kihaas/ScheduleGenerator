@@ -183,3 +183,5 @@ PUT /api/teachers/{id} - редактировать преподавателя
 <img width="771" height="623" alt="image" src="https://github.com/user-attachments/assets/9eca3259-2113-414b-a2a1-436295558643" />
 
 <img width="529" height="401" alt="image" src="https://github.com/user-attachments/assets/b2b745c7-0c8b-4b9e-9ba2-46b2d4370864" />
+
+![img.png](img.png)

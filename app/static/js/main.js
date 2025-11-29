@@ -204,6 +204,31 @@ class ScheduleApp {
             console.error('Error loading saved schedules:', error);
         }
     }
+
+    async deleteSavedSchedule(scheduleId) {
+    if (!confirm('Удалить это сохраненное расписание?')) return;
+
+    this.showLoading();
+
+    try {
+        const response = await fetch(`/api/schedules/${scheduleId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            this.showSuccess('Сохраненное расписание удалено');
+            await this.loadSavedSchedules();
+        } else {
+            const result = await response.json();
+            throw new Error(result.detail || 'Ошибка удаления расписания');
+        }
+    } catch (error) {
+        this.showError('Ошибка удаления расписания: ' + error.message);
+    } finally {
+        this.hideLoading();
+    }
+}
+
     async deleteFilter(teacher) {
     if (!confirm(`Удалить ограничения для ${teacher}?`)) return;
 
@@ -319,32 +344,34 @@ class ScheduleApp {
 
 
     renderSavedSchedulesList() {
-        const container = document.getElementById('savedSchedulesList');
-        if (!this.savedSchedules.length) {
-            container.innerHTML = '<div class="empty-state">Нет сохраненных расписаний</div>';
-            return;
-        }
+    const container = document.getElementById('savedSchedulesList');
+    if (!this.savedSchedules.length) {
+        container.innerHTML = '<div class="empty-state">Нет сохраненных расписаний</div>';
+        return;
+    }
 
-        container.innerHTML = this.savedSchedules.map(schedule => `
-            <div class="saved-schedule-item" data-id="${schedule.id}">
-                <div class="schedule-info">
-                    <strong>${schedule.name}</strong>
-                    <div class="schedule-meta">
-                        ${new Date(schedule.created_at).toLocaleDateString()} • 
-                        ${schedule.lesson_count} пар
-                    </div>
-                </div>
-                <div class="schedule-actions">
-                    <button class="btn-primary btn-small" onclick="app.loadSchedule(${schedule.id})">
-                        <i class="fas fa-download"></i>
-                    </button>
-                    <button class="btn-danger btn-small" onclick="app.deleteSchedule(${schedule.id})">
-                        <i class="fas fa-times"></i>
-                    </button>
+    container.innerHTML = this.savedSchedules.map(schedule => `
+        <div class="saved-schedule-item" data-id="${schedule.id}">
+            <div class="schedule-info">
+                <strong>${schedule.name}</strong>
+                <div class="schedule-meta">
+                    ${new Date(schedule.created_at).toLocaleDateString()} • 
+                    ${schedule.lesson_count} пар
                 </div>
             </div>
-        `).join('');
-    }
+            <div class="schedule-actions">
+                <button class="btn-primary btn-small" onclick="app.exportSchedule(${schedule.id}, '${schedule.name.replace(/'/g, "\\'")}')" 
+                        title="Скачать в Excel">
+                    <i class="fas fa-download"></i>
+                </button>
+                <!-- ИСПРАВИТЬ ЭТУ КНОПКУ -->
+                <button class="btn-danger btn-small" onclick="app.deleteSavedSchedule(${schedule.id})" title="Удалить">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
 
     renderFiltersList() {
     const container = document.getElementById('filtersList');
@@ -966,6 +993,84 @@ async generateSchedule() {
             this.showError('Ошибка очистки: ' + error.message);
         }
     }
+
+    async exportSchedule(scheduleId, scheduleName) {
+    this.showLoading();
+
+    try {
+        console.log(`📤 Экспорт расписания ${scheduleId}: "${scheduleName}"`);
+
+        const response = await fetch(`/api/export/schedule/${scheduleId}`);
+
+        console.log(`📥 Ответ сервера: ${response.status} ${response.statusText}`);
+
+        if (response.ok) {
+            const blob = await response.blob();
+            console.log(`📊 Размер файла: ${blob.size} bytes`);
+            console.log(`📊 Тип файла: ${blob.type}`);
+
+            if (blob.size === 0) {
+                throw new Error('Файл пустой');
+            }
+
+            // Создаем blob и скачиваем файл
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+
+            // Формируем имя файла с названием расписания
+            const filename = `${scheduleName.replace(/[<>:"/\\|?*]/g, '_')}.xlsx`;
+            a.download = filename;
+
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            this.showSuccess(`Файл "${scheduleName}.xlsx" успешно скачан`);
+        } else {
+            const errorText = await response.text();
+            console.error(`❌ Ошибка сервера: ${errorText}`);
+            throw new Error(`Ошибка сервера: ${response.status}`);
+        }
+    } catch (error) {
+        console.error('💥 Ошибка экспорта:', error);
+        this.showError('Ошибка экспорта: ' + error.message);
+    } finally {
+        this.hideLoading();
+    }
+}
+
+async exportCurrentSchedule() {
+    this.showLoading();
+
+    try {
+        const response = await fetch('/api/export/current');
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = 'текущее_расписание.xlsx';
+
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            this.showSuccess('Текущее расписание экспортировано в Excel');
+        } else {
+            throw new Error('Ошибка экспорта текущего расписания');
+        }
+    } catch (error) {
+        this.showError('Ошибка экспорта: ' + error.message);
+    } finally {
+        this.hideLoading();
+    }
+}
 
     async updateStatistics() {
     try {
