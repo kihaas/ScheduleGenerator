@@ -86,9 +86,18 @@ class Database:
             await tables.close()
 
             if 'subjects' not in existing_tables:
-                print("📦 Создаем структуру базы данных...")
+                print("📦 Создаем структуру базы данных с новой архитектурой...")
 
-                # Таблица преподавателей
+                # ТАБЛИЦА ГРУПП
+                await conn.execute('''
+                    CREATE TABLE study_groups (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL UNIQUE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+
+                # Таблица преподавателей - БЕЗ group_id (ГЛОБАЛЬНЫЕ)
                 await conn.execute('''
                     CREATE TABLE teachers (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -97,7 +106,7 @@ class Database:
                     )
                 ''')
 
-                # Таблица предметов
+                # Таблица предметов - С group_id (ЛОКАЛЬНЫЕ ДЛЯ ГРУППЫ)
                 await conn.execute('''
                     CREATE TABLE subjects (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -109,11 +118,12 @@ class Database:
                         priority INTEGER DEFAULT 0,
                         max_per_day INTEGER DEFAULT 2,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        UNIQUE(teacher, subject_name)
+                        group_id INTEGER DEFAULT 1,
+                        UNIQUE(teacher, subject_name, group_id)
                     )
                 ''')
 
-                # Таблица занятий
+                # Таблица занятий - С group_id (ЛОКАЛЬНЫЕ ДЛЯ ГРУППЫ)
                 await conn.execute('''
                     CREATE TABLE lessons (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -123,28 +133,31 @@ class Database:
                         subject_name TEXT NOT NULL,
                         editable BOOLEAN DEFAULT 1,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        UNIQUE(day, time_slot)
+                        group_id INTEGER DEFAULT 1,
+                        UNIQUE(day, time_slot, group_id)
                     )
                 ''')
 
-                # Таблица фильтров
+                # Таблица фильтров - С group_id (НО МОЖНО ИСПОЛЬЗОВАТЬ ГЛОБАЛЬНО)
                 await conn.execute('''
                     CREATE TABLE negative_filters (
                         teacher TEXT PRIMARY KEY,
                         restricted_days TEXT DEFAULT '[]',
                         restricted_slots TEXT DEFAULT '[]',
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        group_id INTEGER DEFAULT 1
                     )
                 ''')
 
-                # Таблица сохраненных расписаний
+                # Таблица сохраненных расписаний - С group_id
                 await conn.execute('''
                     CREATE TABLE saved_schedules (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         user_id INTEGER,
                         name TEXT NOT NULL,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        payload TEXT NOT NULL
+                        payload TEXT NOT NULL,
+                        group_id INTEGER DEFAULT 1
                     )
                 ''')
 
@@ -152,11 +165,17 @@ class Database:
                 await conn.execute('CREATE INDEX idx_subjects_teacher ON subjects(teacher)')
                 await conn.execute('CREATE INDEX idx_lessons_day_time ON lessons(day, time_slot)')
                 await conn.execute('CREATE INDEX idx_teachers_name ON teachers(name)')
+                await conn.execute('CREATE INDEX idx_group_id_subjects ON subjects(group_id)')
+                await conn.execute('CREATE INDEX idx_group_id_lessons ON lessons(group_id)')
+
+                # Добавляем основную группу
+                await conn.execute('INSERT INTO study_groups (id, name) VALUES (1, "Основная")')
 
                 await conn.commit()
-                print("✅ База данных создана с полной структурой")
+                print("✅ База данных создана с новой архитектурой (преподаватели глобальные)")
             else:
-                print("✅ База данных уже инициализирована")
+                print("✅ База данных уже инициализирована, применяем миграцию...")
+                await self._migrate_to_new_architecture(conn)
 
             self._initialized = True
 
@@ -166,6 +185,50 @@ class Database:
         finally:
             if 'conn' in locals():
                 await conn.close()
+
+    async def _migrate_to_new_architecture(self, conn):
+        """Миграция на новую архитектуру (преподаватели глобальные)"""
+        try:
+            # 1. Убираем group_id из teachers если есть
+            columns = await conn.execute("PRAGMA table_info(teachers)")
+            column_names = [col[1] for col in await columns.fetchall()]
+
+            if 'group_id' in column_names:
+                print("🔄 Миграция: убираем group_id из teachers...")
+
+                # Создаем временную таблицу без group_id
+                await conn.execute('''
+                    CREATE TABLE teachers_new (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL UNIQUE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+
+                # Копируем уникальных преподавателей
+                await conn.execute('''
+                    INSERT OR IGNORE INTO teachers_new (id, name, created_at)
+                    SELECT MIN(id), name, MIN(created_at) 
+                    FROM teachers 
+                    GROUP BY name
+                ''')
+
+                # Удаляем старую таблицу
+                await conn.execute('DROP TABLE teachers')
+
+                # Переименовываем новую таблицу
+                await conn.execute('ALTER TABLE teachers_new RENAME TO teachers')
+
+                print("✅ Преподаватели мигрированы в глобальную таблицу")
+
+            # 2. Добавляем недостающие индексы
+            await conn.execute('CREATE INDEX IF NOT EXISTS idx_group_id_subjects ON subjects(group_id)')
+            await conn.execute('CREATE INDEX IF NOT EXISTS idx_group_id_lessons ON lessons(group_id)')
+
+            print("✅ Миграция завершена")
+
+        except Exception as e:
+            print(f"⚠️ Ошибка миграции: {e}")
 
 
 # Глобальный экземпляр базы данных

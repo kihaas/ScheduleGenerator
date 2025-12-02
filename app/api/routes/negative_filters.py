@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Form
+from fastapi import APIRouter, HTTPException, Form, Query
 from fastapi.responses import JSONResponse, RedirectResponse
 from typing import List
 from pydantic import BaseModel
@@ -15,16 +15,20 @@ class NegativeFilterRequest(BaseModel):
 
 
 @router.post("/api/negative-filters")
-async def add_negative_filter_api(request: NegativeFilterRequest):
+async def add_negative_filter_api(
+        request: NegativeFilterRequest,
+        group_id: int = Query(1, description="ID группы")
+):
     """Добавить ограничения для преподавателя через JSON"""
     try:
         print(
-            f"📨 Получен запрос: teacher={request.teacher}, days={request.restricted_days}, slots={request.restricted_slots}")
+            f"📨 Получен запрос: teacher={request.teacher}, days={request.restricted_days}, slots={request.restricted_slots}, group_id={group_id}")
 
         await negative_filters_service.save_negative_filter(
             request.teacher,
             request.restricted_days,
-            request.restricted_slots
+            request.restricted_slots,
+            group_id
         )
 
         return JSONResponse(
@@ -37,20 +41,23 @@ async def add_negative_filter_api(request: NegativeFilterRequest):
 
 
 @router.get("/api/negative-filters")
-async def get_negative_filters_api():
+async def get_negative_filters_api(group_id: int = Query(1, description="ID группы")):
     """Получить все ограничения"""
     try:
-        filters = await negative_filters_service.get_negative_filters()
+        filters = await negative_filters_service.get_negative_filters(group_id)
         return filters
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка получения ограничений: {str(e)}")
 
 
 @router.delete("/api/negative-filters/{teacher}")
-async def remove_negative_filter_api(teacher: str):
+async def remove_negative_filter_api(
+        teacher: str,
+        group_id: int = Query(1, description="ID группы")
+):
     """Удалить ограничения для преподавателя"""
     try:
-        await negative_filters_service.remove_negative_filter(teacher)
+        await negative_filters_service.remove_negative_filter(teacher, group_id)
         return JSONResponse(
             status_code=200,
             content={"success": True, "message": "Ограничения удалены"}

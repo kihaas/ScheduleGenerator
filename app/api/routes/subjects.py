@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Form
+from fastapi import APIRouter, HTTPException, Form, Query
 from fastapi.responses import JSONResponse
 from typing import List
 from pydantic import BaseModel
@@ -27,12 +27,11 @@ class SubjectCreateRequest(BaseModel):
     max_per_day: int = 2
 
 
-
 @router.get("/api/subjects", response_model=List[SubjectResponse])
-async def get_all_subjects():
+async def get_all_subjects(group_id: int = Query(1, description="ID группы")):  # ДОБАВИТЬ параметр
     """Получить все уникальные предметы"""
     try:
-        subjects = await subject_service.get_all_subjects()
+        subjects = await subject_service.get_all_subjects(group_id)  # ПЕРЕДАТЬ group_id
         return [
             SubjectResponse(
                 id=subject.id,
@@ -49,13 +48,12 @@ async def get_all_subjects():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка получения предметов: {str(e)}")
 
-
 @router.post("/api/subjects")
-async def create_subject_api(request: SubjectCreateRequest):
+async def create_subject_api(request: SubjectCreateRequest, group_id: int = Query(1, description="ID группы")):  # ДОБАВИТЬ параметр
     """Создать предмет с проверкой уникальности"""
     try:
         # Проверяем существование предмета
-        existing = await subject_service.get_subject_by_name(request.teacher, request.subject_name)
+        existing = await subject_service.get_subject_by_name(request.teacher, request.subject_name, group_id)  # ПЕРЕДАТЬ group_id
         if existing:
             return JSONResponse(
                 status_code=409,
@@ -65,7 +63,7 @@ async def create_subject_api(request: SubjectCreateRequest):
         # Создаем предмет
         subject = await subject_service.create_subject(
             request.teacher, request.subject_name, request.hours,
-            request.priority, request.max_per_day
+            request.priority, request.max_per_day, group_id  # ПЕРЕДАТЬ group_id
         )
 
         return JSONResponse(
@@ -84,7 +82,6 @@ async def create_subject_api(request: SubjectCreateRequest):
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Ошибка создания предмета: {str(e)}")
-
 
 @router.delete("/api/subjects/{subject_id}")
 async def delete_subject_api(subject_id: int):

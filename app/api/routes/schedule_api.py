@@ -1,15 +1,11 @@
-from fastapi import APIRouter, HTTPException, Query, Body
-from fastapi.openapi.models import Response
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from datetime import datetime
 import json
 
-from app.api.routes import lessons
-from app.services.exel_exporter import ExcelExporter
 from app.services.schedule_services import schedule_service
-from app.services.subject_services import subject_service
 from app.db.database import database
 from app.db.models import Lesson
 
@@ -58,10 +54,10 @@ class SavedScheduleResponse(BaseModel):
 
 
 @router.post("/api/schedule/generate", response_model=GenerateScheduleResponse)
-async def generate_schedule():
-    """Сгенерировать новое расписание"""
+async def generate_schedule(group_id: int = Query(1, description="ID группы")):
+    """Сгенерировать новое расписание для группы"""
     try:
-        lessons = await schedule_service.generate_schedule()
+        lessons = await schedule_service.generate_schedule(group_id)  # ПЕРЕДАТЬ group_id
 
         # Конвертируем в словари для JSON
         lessons_data = []
@@ -80,7 +76,7 @@ async def generate_schedule():
         return GenerateScheduleResponse(
             success=True,
             lessons=lessons_data,
-            message=f"Сгенерировано {len(lessons)} пар"
+            message=f"Сгенерировано {len(lessons)} пар для группы {group_id}"
         )
 
     except Exception as e:
@@ -91,130 +87,16 @@ async def generate_schedule():
         )
 
 
-@router.get("/api/lessons", response_model=List[LessonResponse])
-async def get_all_lessons():
-    """Получить все уроки"""
-    try:
-        lessons = await schedule_service.get_all_lessons()
-        return lessons
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка получения уроков: {str(e)}"
-        )
-
-@router.delete("/api/lessons")
-async def remove_lesson(
-        day: int = Query(..., ge=0, le=6, description="Day of week (0-6)"),
-        time_slot: int = Query(..., ge=0, le=3, description="Time slot (0-3)")
-):
-    """Удалить урок по дню и временному слоту"""
-    try:
-        success = await schedule_service.remove_lesson(day, time_slot)
-
-        if not success:
-            raise HTTPException(
-                status_code=404,
-                detail="Урок не найден или не может быть удален"
-            )
-
-        return JSONResponse(
-            status_code=200,
-            content={"success": True, "message": "Урок успешно удален"}
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка удаления урока: {str(e)}"
-        )
-
-
-@router.patch("/api/lessons")
-async def update_lesson(request: UpdateLessonRequest):
-    """Обновить урок"""
-    try:
-        success = await schedule_service.update_lesson(
-            request.day,
-            request.time_slot,
-            request.new_teacher,
-            request.new_subject_name
-        )
-
-        if not success:
-            raise HTTPException(
-                status_code=400,
-                detail="Не удалось обновить урок (возможно, урок не редактируемый или не найден)"
-            )
-
-        return JSONResponse(
-            status_code=200,
-            content={"success": True, "message": "Урок успешно обновлен"}
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка обновления урока: {str(e)}"
-        )
-
-
-@router.post("/api/schedules/save")
-async def save_schedule(request: SaveScheduleRequest):
-    """Сохранить расписание"""
-    try:
-        # Создаем таблицу saved_schedules если не существует
-        await database.execute('''
-            CREATE TABLE IF NOT EXISTS saved_schedules (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                name TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                payload TEXT NOT NULL
-            )
-        ''')
-
-        # Сохраняем расписание
-        payload = json.dumps({
-            "lessons": request.lessons,
-            "saved_at": datetime.now().isoformat()
-        })
-
-        result = await database.execute(
-            'INSERT INTO saved_schedules (name, payload) VALUES (?, ?)',
-            (request.name, payload)
-        )
-
-        return JSONResponse(
-            status_code=201,
-            content={
-                "success": True,
-                "message": "Расписание сохранено",
-                "schedule_id": result.lastrowid
-            }
-        )
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка сохранения расписания: {str(e)}"
-        )
-
-
 @router.get("/api/schedules", response_model=List[SavedScheduleResponse])
-async def get_saved_schedules():
-    """Получить список сохраненных расписаний"""
+async def get_saved_schedules(group_id: int = Query(1, description="ID группы")):
+    """Получить список сохраненных расписаний группы"""
     try:
         rows = await database.fetch_all('''
             SELECT id, name, created_at, payload 
             FROM saved_schedules 
+            WHERE group_id = ?
             ORDER BY created_at DESC
-        ''')
+        ''', (group_id,))
 
         schedules = []
         for row in rows:
@@ -240,6 +122,37 @@ async def get_saved_schedules():
         raise HTTPException(
             status_code=500,
             detail=f"Ошибка получения расписаний: {str(e)}"
+        )
+
+
+@router.post("/api/schedules/save")
+async def save_schedule(request: SaveScheduleRequest, group_id: int = Query(1, description="ID группы")):
+    """Сохранить расписание для группы"""
+    try:
+        payload = json.dumps({
+            "lessons": request.lessons,
+            "saved_at": datetime.now().isoformat(),
+            "group_id": group_id
+        })
+
+        result = await database.execute(
+            'INSERT INTO saved_schedules (name, payload, group_id) VALUES (?, ?, ?)',
+            (request.name, payload, group_id)
+        )
+
+        return JSONResponse(
+            status_code=201,
+            content={
+                "success": True,
+                "message": "Расписание сохранено",
+                "schedule_id": result.lastrowid
+            }
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка сохранения расписания: {str(e)}"
         )
 
 
@@ -311,4 +224,33 @@ async def delete_schedule(schedule_id: int):
         raise HTTPException(
             status_code=500,
             detail=f"Ошибка удаления расписания: {str(e)}"
+        )
+
+
+@router.get("/api/schedule/check-teacher")
+async def check_teacher_availability(
+        teacher: str = Query(..., description="Имя преподавателя"),
+        day: int = Query(..., ge=0, le=6, description="День недели"),
+        time_slot: int = Query(..., ge=0, le=3, description="Временной слот"),
+        group_id: int = Query(1, description="ID группы")
+):
+    """Проверить доступность преподавателя в указанный слот"""
+    try:
+        from app.services.shedule_generator import schedule_generator
+
+        available = await schedule_generator.can_assign_teacher(teacher, day, time_slot, group_id)
+
+        return {
+            "teacher": teacher,
+            "day": day,
+            "time_slot": time_slot,
+            "group_id": group_id,
+            "available": available,
+            "message": "Доступен" if available else "Занят в другой группе или имеет ограничения"
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка проверки доступности: {str(e)}"
         )

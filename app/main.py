@@ -10,7 +10,8 @@ import sys
 from app.api.routes import api_router
 from app.services.schedule_services import schedule_service
 from app.services.subject_services import subject_service
-from app.services.teacher_service import teacher_service
+from app.services.teacher_service import teacher_service  # ИСПРАВЛЕН ИМПОРТ
+from app.services.group_service import group_service  # ДОБАВЛЕН ИМПОРТ
 from pathlib import Path
 
 app = FastAPI(
@@ -19,6 +20,7 @@ app = FastAPI(
     version="2.0.0",
     debug=True
 )
+
 
 # Mount static files and templates
 @asynccontextmanager
@@ -76,19 +78,26 @@ async def general_exception_handler(request: Request, exc: Exception):
 async def read_root(request: Request):
     """Главная страница приложения"""
     try:
-        subjects = [s.model_dump() for s in await subject_service.get_all_subjects()]
-        lessons = [l.model_dump() for l in await schedule_service.get_all_lessons()]
-        teachers = [t.model_dump() for t in await teacher_service.get_all_teachers()]
+        # Получаем текущую группу из запроса (по умолчанию 1)
+        group_id = int(request.query_params.get("group_id", 1))
 
-        # ИСПРАВЛЕННЫЙ КОД - используем правильный сервис для фильтров
+        # Загружаем данные ДЛЯ КОНКРЕТНОЙ ГРУППЫ
+        subjects = [s.model_dump() for s in await subject_service.get_all_subjects(group_id)]
+        lessons = [l.model_dump() for l in await schedule_service.get_all_lessons(group_id)]
+
+        # ПРЕПОДАВАТЕЛИ - ГЛОБАЛЬНЫЕ (не зависят от группы)
+        teachers = [t.model_dump() for t in await teacher_service.get_all_teachers()]  # БЕЗ group_id
+
+        groups = [g.model_dump() for g in await group_service.get_all_groups()]
+
+        # Загружаем фильтры для группы
         try:
-            # Импортируем сервис фильтров
             from app.services.negative_filters_service import negative_filters_service
-            negative_filters = await negative_filters_service.get_negative_filters()
-            print(f"✅ Фильтры загружены: {len(negative_filters)} записей")
+            negative_filters = await negative_filters_service.get_negative_filters(group_id)
+            print(f"✅ Фильтры загружены для группы {group_id}: {len(negative_filters)} записей")
         except Exception as e:
             print(f"⚠️ Ошибка загрузки фильтров: {e}")
-            negative_filters = {}  # Пустой словарь вместо ошибки
+            negative_filters = {}
 
         # Создаем матрицу расписания для шаблона
         schedule_matrix = [[None for _ in range(4)] for _ in range(7)]
@@ -98,11 +107,18 @@ async def read_root(request: Request):
             if 0 <= day < 7 and 0 <= time_slot < 4:
                 schedule_matrix[day][time_slot] = lesson
 
+        # Находим текущую группу
+        current_group = next((g for g in groups if g['id'] == group_id), None)
+        current_group_name = current_group['name'] if current_group else "Неизвестная группа"
+
         return templates.TemplateResponse("index.html", {
             "request": request,
             "subjects": subjects,
             "teachers": teachers,
             "negative_filters": negative_filters,
+            "groups": groups,  # ПЕРЕДАЕМ СПИСОК ГРУПП В ШАБЛОН
+            "current_group_id": group_id,  # ПЕРЕДАЕМ ТЕКУЩУЮ ГРУППУ
+            "current_group_name": current_group_name,  # ПЕРЕДАЕМ НАЗВАНИЕ ГРУППЫ
             "schedule_matrix": schedule_matrix,
             "week_days": ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"],
             "time_slots": [
@@ -134,7 +150,9 @@ async def health_check():
         "version": "2.0.0"
     }
 
+
 if __name__ == "__main__":
     import uvicorn
+
     # Используем строку импорта вместо объекта app
     uvicorn.run("main:app", port=8000, reload=False)

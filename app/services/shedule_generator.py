@@ -1,205 +1,190 @@
 from typing import List, Dict, Tuple
 import random
+import json
 
-from app.db import database
+from app.db.database import database
 from app.db.models import Lesson, Subject
 from app.services.subject_services import subject_service
 from app.services.negative_filters_service import negative_filters_service
 
+
 class ScheduleGenerator:
-    """Slot-first генератор расписания для unit-тестирования"""
+    """Улучшенный генератор расписания с проверкой конфликтов между группами"""
 
     def __init__(self):
         self.occupied_slots = set()
 
-    async def generate_schedule(self) -> List[Lesson]:
-        """Генерация расписания"""
-        print("🔄 Начинаем генерацию расписания...")
+    async def generate_schedule(self, group_id: int = 1) -> List[Lesson]:
+        """Генерация расписания для конкретной группы"""
+        print(f"🔄 Начинаем генерацию расписания для группы {group_id}...")
 
-        subjects = await subject_service.get_all_subjects()
-        print(f"📚 Найдено предметов: {len(subjects)}")
+        # Получаем предметы для конкретной группы
+        subjects = await subject_service.get_all_subjects(group_id)
+        print(f"📚 Найдено предметов в группе {group_id}: {len(subjects)}")
 
         if not subjects:
             print("❌ Нет предметов для генерации")
             return []
 
-        # Очищаем текущее расписание
-        await database.execute('DELETE FROM lessons')
+        # Получаем фильтры для группы
+        negative_filters = await subject_service.get_negative_filters(group_id)
+        print(f"🎯 Ограничений для группы {group_id}: {len(negative_filters)}")
 
-        # Сбрасываем remaining_pairs для всех предметов
-        for subject in subjects:
-            await database.execute(
-                'UPDATE subjects SET remaining_pairs = ?, remaining_hours = ? WHERE id = ?',
-                (subject.total_hours // 2, subject.total_hours, subject.id)
-            )
+        # Генерируем расписание с проверкой конфликтов
+        lessons = await self.generate(subjects, negative_filters, group_id)
 
-        # Перезагружаем предметы с обновленными данными
-        subjects = await subject_service.get_all_subjects()
-
-        # Создаем уроки
-        lessons = []
-        subject_index = 0
-
-        for day in range(5):  # Пн-Пт
-            for time_slot in range(4):  # 4 пары
-                if not subjects:
-                    break
-
-                # Ищем предмет с оставшимися парами
-                subject_found = None
-                for i in range(len(subjects)):
-                    subject = subjects[(subject_index + i) % len(subjects)]
-                    if subject.remaining_pairs > 0:
-                        subject_found = subject
-                        break
-
-                if not subject_found:
-                    break
-
-                lesson = Lesson(
-                    day=day,
-                    time_slot=time_slot,
-                    teacher=subject_found.teacher,
-                    subject_name=subject_found.subject_name,
-                    editable=True
-                )
-                lessons.append(lesson)
-
-                # Уменьшаем количество оставшихся пар и часов
-                await database.execute(
-                    'UPDATE subjects SET remaining_pairs = remaining_pairs - 1, remaining_hours = remaining_hours - 2 WHERE id = ?',
-                    (subject_found.id,)
-                )
-
-                subject_index += 1
+        # Очищаем старые уроки группы
+        await database.execute(
+            'DELETE FROM lessons WHERE group_id = ?',
+            (group_id,)
+        )
 
         # Сохраняем уроки
         for lesson in lessons:
             await database.execute(
-                'INSERT INTO lessons (day, time_slot, teacher, subject_name, editable) VALUES (?, ?, ?, ?, ?)',
-                (lesson.day, lesson.time_slot, lesson.teacher, lesson.subject_name, int(lesson.editable))
+                'INSERT INTO lessons (day, time_slot, teacher, subject_name, editable, group_id) VALUES (?, ?, ?, ?, ?, ?)',
+                (lesson.day, lesson.time_slot, lesson.teacher, lesson.subject_name, int(lesson.editable), group_id)
             )
 
-        print(f"✅ Сгенерировано уроков: {len(lessons)}")
+        # Обновляем часы предметов в БД
+        for lesson in lessons:
+            await database.execute(
+                '''UPDATE subjects 
+                   SET remaining_hours = remaining_hours - 2, 
+                       remaining_pairs = remaining_pairs - 1 
+                   WHERE teacher = ? AND subject_name = ? AND group_id = ?''',
+                (lesson.teacher, lesson.subject_name, group_id)
+            )
 
-        # Логируем итоговое состояние предметов
-        final_subjects = await subject_service.get_all_subjects()
-        for subject in final_subjects:
-            print(
-                f"📊 {subject.teacher} - {subject.subject_name}: {subject.remaining_hours}ч осталось, {subject.remaining_pairs} пар")
+        print(f"✅ Сгенерировано уроков для группы {group_id}: {len(lessons)}")
 
         return lessons
 
-    async def can_assign_teacher(self, teacher: str, day: int, time_slot: int) -> bool:
-        """Проверить, можно ли назначить преподавателя в этот слот"""
-        return await negative_filters_service.check_teacher_availability(teacher, day, time_slot)
+    async def generate(self, subjects: List[Subject], negative_filters: Dict, group_id: int = 1) -> List[Lesson]:
+        """Сгенерировать расписание для группы с проверкой конфликтов между группами"""
+        print(f"🎯 Генерация расписания для группы {group_id}")
+        print(f"📚 Предметов: {len(subjects)}, Ограничений: {len(negative_filters)}")
 
+        lessons = []
+        days = [0, 1, 2, 3, 4]  # Пн-Пт
+        time_slots = [0, 1, 2, 3]  # 4 пары в день
 
-    def _initialize_subject_state(self, subjects: List[Subject]) -> Dict[Tuple[str, str], Dict]:
-        state = {}
-        for subject in subjects:
-            key = (subject.teacher, subject.subject_name)
-            state[key] = {
-                'remaining_pairs': subject.remaining_pairs,
-                'priority': subject.priority,
-                'max_per_day': subject.max_per_day
-            }
-        return state
+        # Сортируем предметы по приоритету (сначала высокий приоритет)
+        sorted_subjects = sorted(subjects, key=lambda x: x.priority, reverse=True)
 
-    def _initialize_daily_count(self, subjects: List[Subject], count_type: str) -> Dict:
-        daily_count = {}
-        for subject in subjects:
-            if count_type == 'teacher':
-                key = subject.teacher
-            else:
-                key = (subject.teacher, subject.subject_name)
+        # Создаем копию для отслеживания оставшихся пар
+        remaining_subjects = []
+        for subject in sorted_subjects:
+            for _ in range(subject.remaining_pairs):
+                remaining_subjects.append(subject)
 
-            daily_count[key] = {day: 0 for day in range(5)}
-        return daily_count
+        random.shuffle(remaining_subjects)
 
-    def _get_candidates_for_slot(self, day: int, time_slot: int, subjects: List[Subject],
-                                 subject_state: Dict, daily_teacher_count: Dict,
-                                 daily_subject_count: Dict, negative_filters: Dict) -> List[Dict]:
-        candidates = []
+        # Заполняем расписание
+        for day in days:
+            daily_subjects = {}  # Для отслеживания max_per_day
 
-        for subject in subjects:
-            teacher = subject.teacher
-            subject_key = (teacher, subject.subject_name)
-            state = subject_state[subject_key]
+            for time_slot in time_slots:
+                if not remaining_subjects:
+                    break
 
-            if not self._is_subject_available(teacher, subject_key, state, day, time_slot,
-                                              daily_teacher_count, daily_subject_count, negative_filters):
-                continue
+                # Пытаемся найти подходящий предмет
+                subject_found = None
+                subject_index = -1
 
-            weight = self._calculate_candidate_weight(state)
+                for i, subject in enumerate(remaining_subjects):
+                    teacher = subject.teacher
 
-            candidates.append({
-                'teacher': teacher,
-                'subject_name': subject.subject_name,
-                'subject_key': subject_key,
-                'weight': weight,
-                'state': state
-            })
+                    # Проверяем локальные ограничения преподавателя
+                    if not self._is_teacher_available(teacher, day, time_slot, negative_filters):
+                        continue
 
-        return candidates
+                    # Проверяем max_per_day
+                    if subject.subject_name in daily_subjects:
+                        if daily_subjects[subject.subject_name] >= subject.max_per_day:
+                            continue
 
-    def _is_subject_available(self, teacher: str, subject_key: Tuple[str, str],
-                              state: Dict, day: int, time_slot: int,
-                              daily_teacher_count: Dict, daily_subject_count: Dict,
-                              negative_filters: Dict) -> bool:
+                    # 🔥 ВАЖНО: Проверяем что преподаватель не занят в это время В ЛЮБОЙ ГРУППЕ
+                    if not await self._is_teacher_free_across_groups(teacher, day, time_slot, group_id):
+                        print(f"🚫 Преподаватель {teacher} занят в день {day}, слот {time_slot} в другой группе")
+                        continue
 
-        if state['remaining_pairs'] <= 0:
+                    subject_found = subject
+                    subject_index = i
+                    break
+
+                if subject_found:
+                    # Создаем урок
+                    lesson = Lesson(
+                        day=day,
+                        time_slot=time_slot,
+                        teacher=subject_found.teacher,
+                        subject_name=subject_found.subject_name,
+                        editable=True
+                    )
+                    lessons.append(lesson)
+
+                    # Обновляем счетчики
+                    if subject_found.subject_name in daily_subjects:
+                        daily_subjects[subject_found.subject_name] += 1
+                    else:
+                        daily_subjects[subject_found.subject_name] = 1
+
+                    # Удаляем использованный предмет
+                    remaining_subjects.pop(subject_index)
+
+        print(f"✅ Сгенерировано уроков: {len(lessons)}")
+        print(f"📊 Осталось нераспределенных пар: {len(remaining_subjects)}")
+
+        return lessons
+
+    def _is_teacher_available(self, teacher: str, day: int, time_slot: int, negative_filters: Dict) -> bool:
+        """Проверить доступность преподавателя по его локальным ограничениям в группе"""
+        if teacher not in negative_filters:
+            return True
+
+        filters = negative_filters[teacher]
+
+        # Проверяем ограничения по дням
+        if day in filters.get('restricted_days', []):
             return False
 
-        restrictions = negative_filters.get(teacher, {})
-        if day in restrictions.get('restricted_days', []):
-            return False
-        if time_slot in restrictions.get('restricted_slots', []):
-            return False
-
-        if daily_teacher_count[teacher][day] >= 4:
-            return False
-
-        if daily_subject_count[subject_key][day] >= state['max_per_day']:
-            return False
-
-        # Проверка что преподаватель не занят в этом слоте
-        if any(lesson.teacher == teacher for lesson in self._get_lessons_in_slot(day, time_slot)):
+        # Проверяем ограничения по слотам
+        if time_slot in filters.get('restricted_slots', []):
             return False
 
         return True
 
-    def _get_lessons_in_slot(self, day: int, time_slot: int) -> List[Lesson]:
-        """Вспомогательный метод для получения уроков в указанном слоте"""
-        # В реальной реализации это будет обращение к списку lessons
-        # Для тестирования можно мокировать
-        return []
+    async def _is_teacher_free_across_groups(self, teacher: str, day: int, time_slot: int,
+                                             current_group_id: int) -> bool:
+        """Проверить что преподаватель свободен в это время ВО ВСЕХ ДРУГИХ ГРУППАХ"""
+        try:
+            # Ищем есть ли у этого преподавателя урок в это время в ЛЮБОЙ ДРУГОЙ группе
+            existing_lesson = await database.fetch_one(
+                'SELECT id FROM lessons WHERE teacher = ? AND day = ? AND time_slot = ? AND group_id != ?',
+                (teacher, day, time_slot, current_group_id)
+            )
 
-    def _calculate_candidate_weight(self, state: Dict) -> float:
-        if state['priority'] > 0:
-            return float(state['priority'])
-        else:
-            return max(1.0, float(state['remaining_pairs']))
+            return existing_lesson is None  # True = свободен, False = занят в другой группе
 
-    def _select_candidate(self, candidates: List[Dict]) -> Dict:
-        if not candidates:
-            return None
+        except Exception as e:
+            print(f"❌ Ошибка проверки занятости преподавателя {teacher}: {e}")
+            return True  # В случае ошибки разрешаем поставить пару
 
-        weights = [candidate['weight'] for candidate in candidates]
-        selected = random.choices(candidates, weights=weights, k=1)[0]
-        return selected
+    async def can_assign_teacher(self, teacher: str, day: int, time_slot: int, current_group_id: int = 1) -> bool:
+        """Проверить, можно ли назначить преподавателя в этот слот"""
+        # 1. Проверяем локальные ограничения (фильтры группы)
+        local_available = await negative_filters_service.check_teacher_availability(teacher, day, time_slot,
+                                                                                    current_group_id)
 
-    def _update_state_after_selection(self, selected: Dict, day: int,
-                                      subject_state: Dict, daily_teacher_count: Dict,
-                                      daily_subject_count: Dict):
-        teacher = selected['teacher']
-        subject_key = selected['subject_key']
+        if not local_available:
+            return False
 
-        subject_state[subject_key]['remaining_pairs'] -= 1
-        daily_teacher_count[teacher][day] += 1
-        daily_subject_count[subject_key][day] += 1
+        # 2. Проверяем что преподаватель свободен в других группах
+        global_available = await self._is_teacher_free_across_groups(teacher, day, time_slot, current_group_id)
+
+        return local_available and global_available
 
 
-
-# Глобальный экземпляр для тестирования
+# Глобальный экземпляр
 schedule_generator = ScheduleGenerator()

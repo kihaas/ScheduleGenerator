@@ -21,7 +21,7 @@ class TeacherResponse(BaseModel):
 
 @router.post("/api/teachers", response_model=TeacherResponse)
 async def create_teacher(request: TeacherCreateRequest):
-    """Создать преподавателя с проверкой уникальности"""
+    """Создать преподавателя (ГЛОБАЛЬНО - для всех групп)"""
     try:
         # Проверяем существование преподавателя
         existing = await teacher_service.get_teacher_by_name(request.name)
@@ -42,9 +42,10 @@ async def create_teacher(request: TeacherCreateRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Ошибка создания преподавателя: {str(e)}")
 
+
 @router.put("/api/teachers/{teacher_id}")
 async def update_teacher(teacher_id: int, request: TeacherCreateRequest):
-    """Обновить преподавателя"""
+    """Обновить преподавателя (ГЛОБАЛЬНО)"""
     try:
         teacher = await teacher_service.update_teacher(teacher_id, request.name)
         if not teacher:
@@ -78,9 +79,10 @@ async def get_teacher(teacher_id: int):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка получения преподавателя: {str(e)}")
 
+
 @router.delete("/api/teachers/{teacher_id}")
 async def delete_teacher(teacher_id: int):
-    """Удалить преподавателя"""
+    """Удалить преподавателя (ГЛОБАЛЬНО - из всех групп)"""
     try:
         print(f"API: Deleting teacher {teacher_id}")
         exists = await teacher_service.teacher_exists(teacher_id)
@@ -102,10 +104,9 @@ async def delete_teacher(teacher_id: int):
         raise HTTPException(status_code=400, detail=f"Ошибка удаления преподавателя: {str(e)}")
 
 
-
 @router.get("/api/teachers", response_model=List[TeacherResponse])
 async def get_teachers():
-    """Получить всех преподавателей"""
+    """Получить всех преподавателей (ГЛОБАЛЬНО - для всех групп)"""
     try:
         teachers = await teacher_service.get_all_teachers()
         return [
@@ -118,3 +119,33 @@ async def get_teachers():
         ]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка получения преподавателей: {str(e)}")
+
+
+@router.get("/api/teachers/by-group/{group_id}", response_model=List[TeacherResponse])
+async def get_teachers_for_group(group_id: int):
+    """Получить преподавателей, которые ведут предметы в указанной группе"""
+    try:
+        teachers = await teacher_service.get_teachers_for_group(group_id)
+        return [
+            TeacherResponse(
+                id=teacher.id,
+                name=teacher.name,
+                created_at=teacher.created_at.isoformat()
+            )
+            for teacher in teachers
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка получения преподавателей для группы: {str(e)}")
+
+
+@router.get("/api/teachers/check-name")
+async def check_teacher_name(name: str):
+    """Проверить существует ли преподаватель с таким именем (ГЛОБАЛЬНО)"""
+    try:
+        existing = await teacher_service.get_teacher_by_name(name)
+        return {
+            "exists": existing is not None,
+            "name": name
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Ошибка проверки имени: {str(e)}")

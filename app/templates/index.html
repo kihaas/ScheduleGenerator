@@ -19,6 +19,34 @@
             </div>
 
             <nav class="sidebar-nav">
+                <!-- Группы -->
+                <div class="nav-section">
+                    <div class="nav-section-header" data-section="groups">
+                        <i class="fas fa-users"></i>
+                        <span>Группы</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="nav-section-content" id="groupsContent">
+                        <div class="form-group">
+                            <label>Текущая группа:</label>
+                            <select id="groupSelector" class="form-control">
+                                <option value="">Загрузка...</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="display: flex; gap: 8px; margin-top: 10px;">
+                            <button class="btn-primary btn-small" onclick="app.createGroup()" style="flex: 1;">
+                                <i class="fas fa-plus"></i> Новая
+                            </button>
+                            <button class="btn-secondary btn-small" onclick="app.renameGroup()" style="flex: 1;">
+                                <i class="fas fa-edit"></i> Переимен.
+                            </button>
+                        </div>
+                        <button class="btn-danger btn-small" onclick="app.deleteCurrentGroup()" style="width: 100%; margin-top: 5px;">
+                            <i class="fas fa-trash"></i> Удалить группу
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Статистика -->
                 <div class="nav-section">
                     <div class="nav-section-header" data-section="statistics">
@@ -260,35 +288,35 @@
     </div>
 
     <!-- Replace Lesson Modal -->
-<div class="modal" id="replaceModal">
-    <div class="modal-content compact-modal">
-        <div class="modal-header">
-            <h3>Заменить пару</h3>
-            <span class="close">&times;</span>
-        </div>
-        <div class="modal-body">
-            <form id="replaceForm">
-                <div class="form-group">
-                    <label>Выберите предмет:</label>
-                    <select name="subject_id" id="replaceSubjectSelect" required>
-                        <option value="">Выберите предмет из списка</option>
-                    </select>
-                </div>
-                <div class="selected-subject-info" id="selectedSubjectInfo" style="display: none; margin-top: 10px; padding: 10px; background: var(--light); border-radius: 6px;">
-                    <div><strong>Преподаватель:</strong> <span id="infoTeacher"></span></div>
-                    <div><strong>Часы:</strong> <span id="infoHours"></span></div>
-                    <div><strong>Осталось пар:</strong> <span id="infoRemainingPairs"></span></div>
-                </div>
-                <input type="hidden" name="day" id="replaceDay">
-                <input type="hidden" name="time_slot" id="replaceTimeSlot">
-            </form>
-        </div>
-        <div class="modal-footer">
-            <button class="btn-secondary" id="cancelReplace">Отмена</button>
-            <button class="btn-primary" id="confirmReplace">Заменить</button>
+    <div class="modal" id="replaceModal">
+        <div class="modal-content compact-modal">
+            <div class="modal-header">
+                <h3>Заменить пару</h3>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="replaceForm">
+                    <div class="form-group">
+                        <label>Выберите предмет:</label>
+                        <select name="subject_id" id="replaceSubjectSelect" required>
+                            <option value="">Выберите предмет из списка</option>
+                        </select>
+                    </div>
+                    <div class="selected-subject-info" id="selectedSubjectInfo" style="display: none; margin-top: 10px; padding: 10px; background: var(--light); border-radius: 6px;">
+                        <div><strong>Преподаватель:</strong> <span id="infoTeacher"></span></div>
+                        <div><strong>Часы:</strong> <span id="infoHours"></span></div>
+                        <div><strong>Осталось пар:</strong> <span id="infoRemainingPairs"></span></div>
+                    </div>
+                    <input type="hidden" name="day" id="replaceDay">
+                    <input type="hidden" name="time_slot" id="replaceTimeSlot">
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="cancelReplace">Отмена</button>
+                <button class="btn-primary" id="confirmReplace">Заменить</button>
+            </div>
         </div>
     </div>
-</div>
 
     <!-- Save Schedule Modal -->
     <div class="modal" id="saveModal">
@@ -308,6 +336,50 @@
             <div class="modal-footer">
                 <button class="btn-secondary" id="cancelSave">Отмена</button>
                 <button class="btn-primary" id="confirmSave">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Group Modal -->
+    <div class="modal" id="createGroupModal">
+        <div class="modal-content compact-modal">
+            <div class="modal-header">
+                <h3>Создать новую группу</h3>
+                <span class="close" onclick="app.closeCreateGroupModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="createGroupForm">
+                    <div class="form-group">
+                        <label>Название группы:</label>
+                        <input type="text" id="newGroupName" placeholder="РПО-1" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="app.closeCreateGroupModal()">Отмена</button>
+                <button class="btn-primary" onclick="app.confirmCreateGroup()">Создать</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rename Group Modal -->
+    <div class="modal" id="renameGroupModal">
+        <div class="modal-content compact-modal">
+            <div class="modal-header">
+                <h3>Переименовать группу</h3>
+                <span class="close" onclick="app.closeRenameGroupModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="renameGroupForm">
+                    <div class="form-group">
+                        <label>Новое название:</label>
+                        <input type="text" id="renameGroupName" placeholder="Новое название" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="app.closeRenameGroupModal()">Отмена</button>
+                <button class="btn-primary" onclick="app.confirmRenameGroup()">Переименовать</button>
             </div>
         </div>
     </div>

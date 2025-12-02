@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Form, HTTPException, Query
 from fastapi.responses import RedirectResponse, JSONResponse
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 import traceback
 
 from app.services.schedule_services import schedule_service
+from app.db.models import Lesson
 
 router = APIRouter(tags=["lessons"])
 
@@ -14,6 +15,29 @@ class UpdateLessonRequest(BaseModel):
     time_slot: int
     new_teacher: str
     new_subject_name: str
+
+
+class LessonResponse(BaseModel):
+    id: Optional[int]
+    day: int
+    time_slot: int
+    teacher: str
+    subject_name: str
+    editable: bool = True
+    is_past: bool = False
+
+
+@router.get("/api/lessons", response_model=List[LessonResponse])
+async def get_all_lessons(group_id: int = Query(1, description="ID группы")):
+    """Получить все уроки группы"""
+    try:
+        lessons = await schedule_service.get_all_lessons(group_id)
+        return lessons
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка получения уроков: {str(e)}"
+        )
 
 
 @router.post("/remove-lesson")
@@ -31,13 +55,14 @@ async def remove_lesson_old(day: int = Form(...), time_slot: int = Form(...)):
 @router.delete("/api/lessons")
 async def remove_lesson_api(
         day: int = Query(..., ge=0, le=6, description="Day of week (0-6)"),
-        time_slot: int = Query(..., ge=0, le=3, description="Time slot (0-3)")
+        time_slot: int = Query(..., ge=0, le=3, description="Time slot (0-3)"),
+        group_id: int = Query(1, description="ID группы")
 ):
     """Удалить урок по дню и временному слоту (JSON API)"""
     try:
-        print(f"🗑️ Удаление урока: день {day}, слот {time_slot}")
+        print(f"🗑️ Удаление урока: день {day}, слот {time_slot}, группа {group_id}")
 
-        success = await schedule_service.remove_lesson(day, time_slot)
+        success = await schedule_service.remove_lesson(day, time_slot, group_id)
 
         if not success:
             raise HTTPException(
@@ -61,7 +86,10 @@ async def remove_lesson_api(
 
 
 @router.patch("/api/lessons")
-async def update_lesson_api(request: UpdateLessonRequest):
+async def update_lesson_api(
+        request: UpdateLessonRequest,
+        group_id: int = Query(1, description="ID группы")
+):
     """Обновить урок (объединенная улучшенная версия)"""
     try:
         print("=" * 50)
@@ -71,6 +99,7 @@ async def update_lesson_api(request: UpdateLessonRequest):
         print(f"📥 Time slot: {request.time_slot} (type: {type(request.time_slot)})")
         print(f"📥 New teacher: '{request.new_teacher}'")
         print(f"📥 New subject: '{request.new_subject_name}'")
+        print(f"📥 Group ID: {group_id}")
 
         # Расширенная валидация
         if not request.new_teacher or not request.new_subject_name:
@@ -94,7 +123,8 @@ async def update_lesson_api(request: UpdateLessonRequest):
             request.day,
             request.time_slot,
             cleaned_teacher,
-            cleaned_subject
+            cleaned_subject,
+            group_id
         )
 
         print(f"📤 Результат update_lesson: {success}")
@@ -103,7 +133,7 @@ async def update_lesson_api(request: UpdateLessonRequest):
             print("❌ Сервис вернул False")
             raise HTTPException(
                 status_code=400,
-                detail="Не удалось обновить урок (возможно, урок не редактируемый или не найден)"
+                detail="Не удалось обновить урок (возможно, урок не редактируемый или не найден, или преподаватель занят в это время)"
             )
 
         print("✅ Урок успешно обновлен!")
@@ -116,7 +146,8 @@ async def update_lesson_api(request: UpdateLessonRequest):
                     "day": request.day,
                     "time_slot": request.time_slot,
                     "teacher": cleaned_teacher,
-                    "subject_name": cleaned_subject
+                    "subject_name": cleaned_subject,
+                    "group_id": group_id
                 }
             }
         )
@@ -177,12 +208,13 @@ async def update_lesson_old(
 @router.get("/api/lessons/{day}/{time_slot}")
 async def get_lesson_detail(
         day: int,
-        time_slot: int
+        time_slot: int,
+        group_id: int = Query(1, description="ID группы")
 ):
     """Получить информацию об уроке в конкретном слоте"""
     try:
         # Ищем урок в общем списке
-        lessons = await schedule_service.get_all_lessons()
+        lessons = await schedule_service.get_all_lessons(group_id)
         lesson = next(
             (l for l in lessons if l.day == day and l.time_slot == time_slot),
             None
@@ -203,7 +235,8 @@ async def get_lesson_detail(
                     "time_slot": lesson.time_slot,
                     "teacher": lesson.teacher,
                     "subject_name": lesson.subject_name,
-                    "editable": getattr(lesson, 'editable', True)
+                    "editable": getattr(lesson, 'editable', True),
+                    "group_id": group_id
                 }
             }
         )
@@ -221,11 +254,12 @@ async def get_lesson_detail(
 @router.get("/api/lessons/check-slot")
 async def check_slot_availability(
         day: int = Query(..., ge=0, le=6),
-        time_slot: int = Query(..., ge=0, le=3)
+        time_slot: int = Query(..., ge=0, le=3),
+        group_id: int = Query(1, description="ID группы")
 ):
     """Проверить доступность слота"""
     try:
-        lessons = await schedule_service.get_all_lessons()
+        lessons = await schedule_service.get_all_lessons(group_id)
         is_occupied = any(
             l.day == day and l.time_slot == time_slot
             for l in lessons
@@ -237,7 +271,8 @@ async def check_slot_availability(
                 "day": day,
                 "time_slot": time_slot,
                 "is_occupied": is_occupied,
-                "available": not is_occupied
+                "available": not is_occupied,
+                "group_id": group_id
             }
         )
 

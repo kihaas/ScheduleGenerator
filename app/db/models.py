@@ -116,3 +116,17 @@ class Statistics(BaseModel):
     remaining_hours: int
     scheduled_pairs: int
     remaining_pairs: int
+
+# Модели для системы групп
+class StudyGroupBase(BaseModel):
+    name: str
+
+class StudyGroupCreate(StudyGroupBase):
+    pass
+
+class StudyGroup(StudyGroupBase):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

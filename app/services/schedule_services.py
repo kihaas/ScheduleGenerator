@@ -1,340 +1,181 @@
-from typing import List, Dict, Tuple
-import random
 from app.db.database import database
-from app.db.models import Lesson, Subject
-from app.services.subject_services import subject_service
-from app.services.teacher_service import teacher_service
-from app.services.negative_filters_service import negative_filters_service
+from app.db.models import Lesson
+from typing import List, Optional
+from app.services.shedule_generator import schedule_generator
+import json
+
 
 class ScheduleService:
-    async def get_all_lessons(self) -> List[Lesson]:
-        """Получить все уроки"""
+    def __init__(self):
+        self.generator = schedule_generator
+
+    async def generate_schedule(self, group_id: int = 1) -> List[Lesson]:
+        """Сгенерировать расписание для группы"""
+        return await self.generator.generate_schedule(group_id)
+
+    async def get_all_lessons(self, group_id: int = 1) -> List[Lesson]:
+        """Получить все уроки группы"""
         rows = await database.fetch_all(
-            'SELECT id, day, time_slot, teacher, subject_name, editable FROM lessons ORDER BY day, time_slot'
+            'SELECT id, day, time_slot, teacher, subject_name, editable FROM lessons WHERE group_id = ? ORDER BY day, time_slot',
+            (group_id,)
         )
-        lessons = []
-        for row in rows:
-            lesson = Lesson(
+        return [
+            Lesson(
                 id=row[0],
                 day=row[1],
                 time_slot=row[2],
                 teacher=row[3],
                 subject_name=row[4],
-                editable=bool(row[5]) if row[5] is not None else True
+                editable=bool(row[5])
             )
-            lessons.append(lesson)
-        return lessons
+            for row in rows
+        ]
 
-    async def save_lessons(self, lessons: List[Lesson]):
-        """Сохранить уроки"""
-        await database.execute('DELETE FROM lessons')
-
-        for lesson in lessons:
-            await database.execute(
-                'INSERT INTO lessons (day, time_slot, teacher, subject_name, editable) VALUES (?, ?, ?, ?, ?)',
-                (lesson.day, lesson.time_slot, lesson.teacher, lesson.subject_name, int(lesson.editable))
-            )
-
-    async def generate_schedule(self) -> List[Lesson]:
-        """Генерация расписания с учетом ограничений"""
-        print("🔄 Начинаем генерацию расписания...")
-
-        subjects = await subject_service.get_all_subjects()
-        negative_filters = await negative_filters_service.get_negative_filters()
-        print(f"📚 Найдено предметов: {len(subjects)}")
-        print(f"🚫 Найдено ограничений: {len(negative_filters)}")
-
-        if not subjects:
-            print("❌ Нет предметов для генерации")
-            return []
-
-        # Очищаем текущее расписание
-        await database.execute('DELETE FROM lessons')
-
-        # Сбрасываем remaining_pairs для всех предметов
-        for subject in subjects:
-            await database.execute(
-                'UPDATE subjects SET remaining_pairs = ?, remaining_hours = ? WHERE id = ?',
-                (subject.total_hours // 2, subject.total_hours, subject.id)
-            )
-
-        # Перезагружаем предметы с обновленными данными
-        subjects = await subject_service.get_all_subjects()
-
-        # Создаем уроки с учетом ограничений
-        lessons = []
-        subject_index = 0
-
-        for day in range(5):  # Пн-Пт
-            for time_slot in range(4):  # 4 пары
-                if not subjects:
-                    break
-
-                # Ищем предмет с оставшимися парами, учитывая ограничения
-                subject_found = None
-                for i in range(len(subjects)):
-                    subject = subjects[(subject_index + i) % len(subjects)]
-
-                    # Проверяем ограничения для преподавателя
-                    if subject.teacher in negative_filters:
-                        restrictions = negative_filters[subject.teacher]
-                        if (day in restrictions.get('restricted_days', []) or
-                                time_slot in restrictions.get('restricted_slots', [])):
-                            print(f"🚫 Пропускаем {subject.teacher} - ограничения для дня {day}, слота {time_slot}")
-                            continue
-
-                    if subject.remaining_pairs > 0:
-                        subject_found = subject
-                        break
-
-                if not subject_found:
-                    continue
-
-                lesson = Lesson(
-                    day=day,
-                    time_slot=time_slot,
-                    teacher=subject_found.teacher,
-                    subject_name=subject_found.subject_name,
-                    editable=True
-                )
-                lessons.append(lesson)
-
-                # Уменьшаем количество оставшихся пар и часов
-                await database.execute(
-                    'UPDATE subjects SET remaining_pairs = remaining_pairs - 1, remaining_hours = remaining_hours - 2 WHERE id = ?',
-                    (subject_found.id,)
-                )
-
-                subject_index += 1
-
-        # Сохраняем уроки
-        for lesson in lessons:
-            await database.execute(
-                'INSERT INTO lessons (day, time_slot, teacher, subject_name, editable) VALUES (?, ?, ?, ?, ?)',
-                (lesson.day, lesson.time_slot, lesson.teacher, lesson.subject_name, int(lesson.editable))
-            )
-
-        print(f"✅ Сгенерировано уроков: {len(lessons)}")
-
-        # Логируем итоговое состояние предметов
-        final_subjects = await subject_service.get_all_subjects()
-        for subject in final_subjects:
-            print(
-                f"📊 {subject.teacher} - {subject.subject_name}: {subject.remaining_hours}ч осталось, {subject.remaining_pairs} пар")
-
-        return lessons
-
-    async def remove_lesson(self, day: int, time_slot: int) -> bool:
+    async def remove_lesson(self, day: int, time_slot: int, group_id: int = 1) -> bool:
         """Удалить урок"""
-        print(f"🔍 Поиск урока для удаления: день {day}, слот {time_slot}")
-
+        # Получаем удаляемый урок
         lesson = await database.fetch_one(
-            'SELECT teacher, subject_name, editable FROM lessons WHERE day = ? AND time_slot = ?',
-            (day, time_slot)
+            'SELECT teacher, subject_name FROM lessons WHERE day = ? AND time_slot = ? AND group_id = ?',
+            (day, time_slot, group_id)
         )
 
         if not lesson:
-            print("❌ Урок не найден")
             return False
 
-        teacher, subject_name, editable = lesson
-        print(f"📋 Найден урок: {teacher} - {subject_name}, editable: {editable}")
+        teacher, subject_name = lesson
 
-        if editable == 0:
-            print("❌ Урок не редактируемый")
-            return False
+        # Восстанавливаем часы предмета
+        await database.execute(
+            '''UPDATE subjects 
+               SET remaining_hours = remaining_hours + 2, 
+                   remaining_pairs = remaining_pairs + 1 
+               WHERE teacher = ? AND subject_name = ? AND group_id = ?''',
+            (teacher, subject_name, group_id)
+        )
 
         # Удаляем урок
-        await database.execute(
-            'DELETE FROM lessons WHERE day = ? AND time_slot = ?',
-            (day, time_slot)
-        )
-        print("✅ Урок удален из базы")
-
-        # Возвращаем пару
-        result = await database.execute('''
-            UPDATE subjects 
-            SET remaining_pairs = remaining_pairs + 1,
-                remaining_hours = remaining_hours + 2
-            WHERE teacher = ? AND subject_name = ?
-        ''', (teacher, subject_name))
-
-        print(f"✅ Часы возвращены для {teacher} - {subject_name}")
-
-        return True
-
-    async def update_lesson(self, day: int, time_slot: int, new_teacher: str, new_subject_name: str) -> bool:
-        """Обновить урок"""
-        print(f"🔄 Обновление урока: день {day}, слот {time_slot}, новый: {new_teacher} - {new_subject_name}")
-
-        current_lesson = await database.fetch_one(
-            'SELECT teacher, subject_name, editable FROM lessons WHERE day = ? AND time_slot = ?',
-            (day, time_slot)
+        result = await database.execute(
+            'DELETE FROM lessons WHERE day = ? AND time_slot = ? AND group_id = ?',
+            (day, time_slot, group_id)
         )
 
-        if not current_lesson:
-            print("❌ Урок не найден")
-            return False
+        return result.rowcount > 0
 
-        if not current_lesson[2]:  # editable
-            print("❌ Урок не редактируемый")
-            return False
-
-        old_teacher, old_subject_name, _ = current_lesson
-        print(f"📋 Текущий урок: {old_teacher} - {old_subject_name}")
-
-        # Обновляем пары
-        await database.execute('''
-            UPDATE subjects 
-            SET remaining_pairs = remaining_pairs + 1,
-                remaining_hours = remaining_hours + 2
-            WHERE teacher = ? AND subject_name = ?
-        ''', (old_teacher, old_subject_name))
-        print(f"✅ Часы возвращены для старого предмета")
-
-        await database.execute('''
-            UPDATE subjects 
-            SET remaining_pairs = remaining_pairs - 1,
-                remaining_hours = remaining_hours - 2
-            WHERE teacher = ? AND subject_name = ?
-        ''', (new_teacher, new_subject_name))
-        print(f"✅ Часы списаны для нового предмета")
-
-        await database.execute(
-            'UPDATE lessons SET teacher = ?, subject_name = ? WHERE day = ? AND time_slot = ?',
-            (new_teacher, new_subject_name, day, time_slot)
-        )
-        print("✅ Урок обновлен в базе")
-
-        return True
-
-    async def update_lesson(self, day: int, time_slot: int, new_teacher: str, new_subject_name: str) -> bool:
-        """Обновить урок на существующий предмет"""
-        print("=" * 30)
-        print(f"🔄 SCHEDULE_SERVICE: Обновление урока")
-        print(f"📍 День: {day}, Слот: {time_slot}")
-        print(f"📍 Новый: {new_teacher} - {new_subject_name}")
-
+    async def update_lesson(self, day: int, time_slot: int, new_teacher: str, new_subject_name: str,
+                            group_id: int = 1) -> bool:
+        """Обновить урок с проверкой конфликтов между группами"""
         try:
-            # Проверяем существование нового предмета
-            print("🔍 Проверяем существование предмета...")
+            # 1. Проверяем что преподаватель не занят в это время В ДРУГИХ ГРУППАХ
+            conflict = await database.fetch_one(
+                'SELECT id FROM lessons WHERE teacher = ? AND day = ? AND time_slot = ? AND group_id != ?',
+                (new_teacher, day, time_slot, group_id)
+            )
+            if conflict:
+                print(f"🚫 Преподаватель {new_teacher} уже занят в это время в другой группе")
+                return False
+
+            # 2. Проверяем что в текущей группе есть такой предмет
             subject_exists = await database.fetch_one(
-                'SELECT id FROM subjects WHERE teacher = ? AND subject_name = ?',
-                (new_teacher, new_subject_name)
+                'SELECT id FROM subjects WHERE teacher = ? AND subject_name = ? AND group_id = ? AND remaining_pairs > 0',
+                (new_teacher, new_subject_name, group_id)
             )
-
             if not subject_exists:
-                print(f"❌ Предмет не найден: {new_teacher} - {new_subject_name}")
+                print(f"🚫 Предмет {new_subject_name} у преподавателя {new_teacher} не найден или нет пар")
                 return False
 
-            print(f"✅ Предмет найден, ID: {subject_exists[0]}")
-
-            # Проверяем существование текущего урока
-            print("🔍 Проверяем существование урока...")
-            current_lesson = await database.fetch_one(
-                'SELECT teacher, subject_name, editable FROM lessons WHERE day = ? AND time_slot = ?',
-                (day, time_slot)
+            # 3. Получаем старый урок (если есть) для восстановления часов
+            old_lesson = await database.fetch_one(
+                'SELECT teacher, subject_name FROM lessons WHERE day = ? AND time_slot = ? AND group_id = ?',
+                (day, time_slot, group_id)
             )
 
-            if not current_lesson:
-                print("❌ Урок не найден в базе")
-                return False
+            if old_lesson:
+                old_teacher, old_subject_name = old_lesson
+                # Восстанавливаем часы старого предмета
+                await database.execute(
+                    '''UPDATE subjects 
+                       SET remaining_hours = remaining_hours + 2, 
+                           remaining_pairs = remaining_pairs + 1 
+                       WHERE teacher = ? AND subject_name = ? AND group_id = ?''',
+                    (old_teacher, old_subject_name, group_id)
+                )
 
-            old_teacher, old_subject_name, editable = current_lesson
-            print(f"📋 Текущий урок: {old_teacher} - {old_subject_name}, editable: {editable}")
+            # 4. Обновляем урок
+            result = await database.execute(
+                'UPDATE lessons SET teacher = ?, subject_name = ? WHERE day = ? AND time_slot = ? AND group_id = ?',
+                (new_teacher, new_subject_name, day, time_slot, group_id)
+            )
 
-            if not editable:
-                print("❌ Урок не редактируемый")
-                return False
-
-            # Если заменяем на тот же предмет - ничего не делаем
-            if old_teacher == new_teacher and old_subject_name == new_subject_name:
-                print("⚠️ Замена на тот же предмет - пропускаем")
+            if result.rowcount > 0:
+                # 5. Уменьшаем часы нового предмета
+                await database.execute(
+                    '''UPDATE subjects 
+                       SET remaining_hours = remaining_hours - 2, 
+                           remaining_pairs = remaining_pairs - 1 
+                       WHERE teacher = ? AND subject_name = ? AND group_id = ?''',
+                    (new_teacher, new_subject_name, group_id)
+                )
                 return True
 
-            print("💰 Обновляем часы у старого предмета...")
-            # Возвращаем часы старому предмету
-            await database.execute('''
-                UPDATE subjects 
-                SET remaining_pairs = remaining_pairs + 1,
-                    remaining_hours = remaining_hours + 2
-                WHERE teacher = ? AND subject_name = ?
-            ''', (old_teacher, old_subject_name))
-            print(f"✅ Часы возвращены для старого предмета")
-
-            print("💰 Списываем часы у нового предмета...")
-            # Списываем часы у нового предмета
-            await database.execute('''
-                UPDATE subjects 
-                SET remaining_pairs = remaining_pairs - 1,
-                    remaining_hours = remaining_hours - 2
-                WHERE teacher = ? AND subject_name = ?
-            ''', (new_teacher, new_subject_name))
-            print(f"✅ Часы списаны для нового предмета")
-
-            print("📝 Обновляем урок в базе...")
-            # Обновляем урок
-            await database.execute(
-                'UPDATE lessons SET teacher = ?, subject_name = ? WHERE day = ? AND time_slot = ?',
-                (new_teacher, new_subject_name, day, time_slot)
-            )
-            print("✅ Урок обновлен в базе")
-
-            return True
-
-        except Exception as e:
-            print(f"💥 Ошибка в update_lesson: {e}")
-            import traceback
-            print(f"💥 Traceback: {traceback.format_exc()}")
             return False
-        finally:
-            print("=" * 30)
-
-    async def get_statistics(self) -> Dict[str, int]:
-        """Получить статистику"""
-        try:
-            subjects = await subject_service.get_all_subjects()
-            lessons = await self.get_all_lessons()
-            teachers = await teacher_service.get_all_teachers()
-
-            total_hours = sum(s.total_hours for s in subjects)
-            remaining_hours = sum(s.remaining_hours for s in subjects)
-            scheduled_pairs = len(lessons)
-            remaining_pairs = sum(s.remaining_pairs for s in subjects)
-
-            print(
-                f"📊 Статистика: {len(subjects)} предметов, {len(teachers)} преподавателей, {scheduled_pairs} пар, {remaining_hours}ч осталось")
-
-            return {
-                'total_subjects': len(subjects),
-                'total_teachers': len(teachers),
-                'total_hours': total_hours,
-                'remaining_hours': remaining_hours,
-                'scheduled_pairs': scheduled_pairs,
-                'remaining_pairs': remaining_pairs
-            }
         except Exception as e:
-            print(f"❌ Ошибка в статистике: {e}")
-            return {
-                'total_subjects': 0,
-                'total_teachers': 0,
-                'total_hours': 0,
-                'remaining_hours': 0,
-                'scheduled_pairs': 0,
-                'remaining_pairs': 0
-            }
+            print(f"❌ Ошибка обновления урока: {e}")
+            return False
+
+    async def get_statistics(self, group_id: int = 1):
+        """Получить статистику для группы"""
+        # Предметы группы
+        subjects_count = await database.fetch_one(
+            'SELECT COUNT(*) FROM subjects WHERE group_id = ?',
+            (group_id,)
+        )
+
+        # Преподаватели, которые ведут предметы в этой группе (локально)
+        teachers_count = await database.fetch_one(
+            'SELECT COUNT(DISTINCT teacher) FROM subjects WHERE group_id = ?',
+            (group_id,)
+        )
+
+        # Часы группы
+        hours_data = await database.fetch_one(
+            'SELECT SUM(total_hours), SUM(remaining_hours) FROM subjects WHERE group_id = ?',
+            (group_id,)
+        )
+
+        # Пары группы
+        pairs_data = await database.fetch_one(
+            'SELECT COUNT(*) FROM lessons WHERE group_id = ?',
+            (group_id,)
+        )
+
+        total_hours = hours_data[0] or 0
+        remaining_hours = hours_data[1] or 0
+        scheduled_pairs = pairs_data[0] or 0
+        remaining_pairs = (remaining_hours // 2) if remaining_hours else 0
+
+        print(
+            f"📊 Статистика группы {group_id}: {subjects_count[0] or 0} предметов, {teachers_count[0] or 0} преподавателей, {scheduled_pairs} пар, {remaining_hours}ч осталось")
+
+        return {
+            "total_subjects": subjects_count[0] or 0,
+            "total_teachers": teachers_count[0] or 0,  # Локальные преподаватели группы
+            "total_hours": total_hours,
+            "remaining_hours": remaining_hours,
+            "scheduled_pairs": scheduled_pairs,
+            "remaining_pairs": remaining_pairs
+        }
 
     def get_week_days(self):
-        return ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье']
+        return ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
 
     def get_time_slots(self):
         return [
-            {'start': '9:00', 'end': '10:30'},
-            {'start': '10:40', 'end': '12:10'},
-            {'start': '12:40', 'end': '14:10'},
-            {'start': '14:20', 'end': '15:50'}
+            {"start": "9:00", "end": "10:30"},
+            {"start": "10:40", "end": "12:10"},
+            {"start": "12:40", "end": "14:10"},
+            {"start": "14:20", "end": "15:50"}
         ]
 
 
-# Создаем экземпляр сервиса
+# Глобальный экземпляр
 schedule_service = ScheduleService()
