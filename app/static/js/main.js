@@ -977,22 +977,23 @@ class ScheduleApp {
 
     // ========== СТАТИСТИКА ==========
     async updateStatistics() {
-        try {
-            const response = await fetch(`/api/statistics?group_id=${this.currentGroupId}`);
-            if (response.ok) {
-                const stats = await response.json();
+    try {
+        const response = await fetch(`/api/statistics?group_id=${this.currentGroupId}`);
+        if (response.ok) {
+            const stats = await response.json();
 
-                // Обновляем новые параметры
-                document.getElementById('statSubjects').textContent = stats.total_subjects;
-                document.getElementById('statTotalHours').textContent = stats.total_hours;
-                document.getElementById('statRemainingHours').textContent = stats.remaining_hours;
+            // Обновляем все параметры
+            document.getElementById('statSubjects').textContent = stats.total_subjects;
+            document.getElementById('statTotalHours').textContent = stats.total_hours;
+            document.getElementById('statRemainingHours').textContent = stats.remaining_hours;
 
-                console.log(`📊 Статистика обновлена для группы ${this.currentGroupId}: ${stats.total_subjects} предметов, ${stats.total_hours}ч всего, ${stats.remaining_hours}ч осталось`);
-            }
-        } catch (error) {
-            console.error('Error loading statistics:', error);
+            console.log(`📊 Статистика обновлена для группы ${this.currentGroupId}:`, stats);
         }
+    } catch (error) {
+        console.error('Error loading statistics:', error);
     }
+}
+
 
     // ========== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ==========
     async refreshAllData() {

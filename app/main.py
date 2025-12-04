@@ -81,14 +81,20 @@ async def read_root(request: Request):
         # Получаем текущую группу из запроса (по умолчанию 1)
         group_id = int(request.query_params.get("group_id", 1))
 
+        print(f"🌐 Загрузка главной страницы для группы {group_id}")
+
         # Загружаем данные ДЛЯ КОНКРЕТНОЙ ГРУППЫ
         subjects = [s.model_dump() for s in await subject_service.get_all_subjects(group_id)]
         lessons = [l.model_dump() for l in await schedule_service.get_all_lessons(group_id)]
 
+        print(f"📊 Данные загружены для группы {group_id}: {len(subjects)} предметов, {len(lessons)} пар")
+
         # ПРЕПОДАВАТЕЛИ - ГЛОБАЛЬНЫЕ (не зависят от группы)
         teachers = [t.model_dump() for t in await teacher_service.get_all_teachers()]  # БЕЗ group_id
+        print(f"👨‍🏫 Преподаватели загружены: {len(teachers)} человек")
 
         groups = [g.model_dump() for g in await group_service.get_all_groups()]
+        print(f"👥 Группы загружены: {len(groups)} групп")
 
         # Загружаем фильтры для группы
         try:
@@ -98,6 +104,11 @@ async def read_root(request: Request):
         except Exception as e:
             print(f"⚠️ Ошибка загрузки фильтров: {e}")
             negative_filters = {}
+
+        # Добавьте здесь вызов статистики для логирования
+        stats = await schedule_service.get_statistics(group_id)
+        print(
+            f"📊 Статистика главной страницы для группы {group_id}: {stats['total_subjects']} предметов, {stats['total_teachers']} преподавателей, {stats['total_hours']} часов, {stats['remaining_hours']} осталось")
 
         # Создаем матрицу расписания для шаблона
         schedule_matrix = [[None for _ in range(4)] for _ in range(7)]
@@ -110,6 +121,7 @@ async def read_root(request: Request):
         # Находим текущую группу
         current_group = next((g for g in groups if g['id'] == group_id), None)
         current_group_name = current_group['name'] if current_group else "Неизвестная группа"
+        print(f"🏫 Текущая группа: {current_group_name} (ID: {group_id})")
 
         return templates.TemplateResponse("index.html", {
             "request": request,
@@ -128,7 +140,8 @@ async def read_root(request: Request):
                 {"start": "14:20", "end": "15:50"}
             ],
             "total_days": 7,
-            "total_time_slots": 4
+            "total_time_slots": 4,
+            "statistics": stats  # ДОБАВЛЕНО: передаем статистику в шаблон
         })
 
     except Exception as e:

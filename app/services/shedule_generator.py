@@ -33,7 +33,7 @@ class ScheduleGenerator:
         # Генерируем расписание с проверкой конфликтов
         lessons = await self.generate(subjects, negative_filters, group_id)
 
-        # Очищаем старые уроки группы
+        # Очищаем старые уроки группы (часы восстановятся автоматически)
         await database.execute(
             'DELETE FROM lessons WHERE group_id = ?',
             (group_id,)
@@ -46,7 +46,17 @@ class ScheduleGenerator:
                 (lesson.day, lesson.time_slot, lesson.teacher, lesson.subject_name, int(lesson.editable), group_id)
             )
 
-        # Обновляем часы предметов в БД
+        # ОБНОВЛЯЕМ ЧАСЫ ПРЕДМЕТОВ ПОСЛЕ ГЕНЕРАЦИИ
+        # Сначала сбрасываем часы к исходным значениям
+        await database.execute(
+            '''UPDATE subjects 
+               SET remaining_hours = total_hours,
+                   remaining_pairs = total_hours / 2 
+               WHERE group_id = ?''',
+            (group_id,)
+        )
+
+        # Затем вычитаем часы для сгенерированных уроков
         for lesson in lessons:
             await database.execute(
                 '''UPDATE subjects 
@@ -79,6 +89,9 @@ class ScheduleGenerator:
                 remaining_subjects.append(subject)
 
         random.shuffle(remaining_subjects)
+
+        # Словарь для отслеживания распределенных часов
+        hours_allocated = {}
 
         # Заполняем расписание
         for day in days:
@@ -130,11 +143,16 @@ class ScheduleGenerator:
                     else:
                         daily_subjects[subject_found.subject_name] = 1
 
+                    # Отмечаем выделенные часы
+                    key = (subject_found.teacher, subject_found.subject_name)
+                    hours_allocated[key] = hours_allocated.get(key, 0) + 2
+
                     # Удаляем использованный предмет
                     remaining_subjects.pop(subject_index)
 
         print(f"✅ Сгенерировано уроков: {len(lessons)}")
         print(f"📊 Осталось нераспределенных пар: {len(remaining_subjects)}")
+        print(f"📊 Распределено часов: {hours_allocated}")
 
         return lessons
 
