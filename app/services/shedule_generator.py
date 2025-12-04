@@ -157,7 +157,7 @@ class ScheduleGenerator:
         return lessons
 
     def _is_teacher_available(self, teacher: str, day: int, time_slot: int, negative_filters: Dict) -> bool:
-        """Проверить доступность преподавателя по его локальным ограничениям в группе"""
+        """Проверить доступность преподавателя по его ГЛОБАЛЬНЫМ ограничениям"""
         if teacher not in negative_filters:
             return True
 
@@ -165,10 +165,12 @@ class ScheduleGenerator:
 
         # Проверяем ограничения по дням
         if day in filters.get('restricted_days', []):
+            print(f"🚫 {teacher} недоступен в день {day} (глобальное ограничение)")
             return False
 
         # Проверяем ограничения по слотам
         if time_slot in filters.get('restricted_slots', []):
+            print(f"🚫 {teacher} недоступен в слот {time_slot} (глобальное ограничение)")
             return False
 
         return True

@@ -81,28 +81,22 @@ async def read_root(request: Request):
         # Получаем текущую группу из запроса (по умолчанию 1)
         group_id = int(request.query_params.get("group_id", 1))
 
-        print(f"🌐 Загрузка главной страницы для группы {group_id}")
-
         # Загружаем данные ДЛЯ КОНКРЕТНОЙ ГРУППЫ
         subjects = [s.model_dump() for s in await subject_service.get_all_subjects(group_id)]
         lessons = [l.model_dump() for l in await schedule_service.get_all_lessons(group_id)]
 
-        print(f"📊 Данные загружены для группы {group_id}: {len(subjects)} предметов, {len(lessons)} пар")
-
-        # ПРЕПОДАВАТЕЛИ - ГЛОБАЛЬНЫЕ (не зависят от группы)
-        teachers = [t.model_dump() for t in await teacher_service.get_all_teachers()]  # БЕЗ group_id
-        print(f"👨‍🏫 Преподаватели загружены: {len(teachers)} человек")
+        # ПРЕПОДАВАТЕЛИ - ГЛОБАЛЬНЫЕ
+        teachers = [t.model_dump() for t in await teacher_service.get_all_teachers()]
 
         groups = [g.model_dump() for g in await group_service.get_all_groups()]
-        print(f"👥 Группы загружены: {len(groups)} групп")
 
-        # Загружаем фильтры для группы
+        # Загружаем ГЛОБАЛЬНЫЕ фильтры
         try:
             from app.services.negative_filters_service import negative_filters_service
-            negative_filters = await negative_filters_service.get_negative_filters(group_id)
-            print(f"✅ Фильтры загружены для группы {group_id}: {len(negative_filters)} записей")
+            negative_filters = await negative_filters_service.get_negative_filters()
+            print(f"✅ Загружено {len(negative_filters)} ГЛОБАЛЬНЫХ фильтров")
         except Exception as e:
-            print(f"⚠️ Ошибка загрузки фильтров: {e}")
+            print(f"⚠️ Ошибка загрузки глобальных фильтров: {e}")
             negative_filters = {}
 
         # Добавьте здесь вызов статистики для логирования

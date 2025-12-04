@@ -15,69 +15,55 @@ class NegativeFilterRequest(BaseModel):
 
 
 @router.post("/api/negative-filters")
-async def add_negative_filter_api(
-        request: NegativeFilterRequest,
-        group_id: int = Query(1, description="ID группы")
-):
-    """Добавить ограничения для преподавателя через JSON"""
+async def add_negative_filter_api(request: NegativeFilterRequest):
+    """Добавить ГЛОБАЛЬНЫЕ ограничения для преподавателя через JSON"""
     try:
-        print(
-            f"📨 Получен запрос: teacher={request.teacher}, days={request.restricted_days}, slots={request.restricted_slots}, group_id={group_id}")
+        print(f"🌍 Сохранение ГЛОБАЛЬНЫХ ограничений: teacher={request.teacher}")
 
         await negative_filters_service.save_negative_filter(
             request.teacher,
             request.restricted_days,
-            request.restricted_slots,
-            group_id
+            request.restricted_slots
         )
 
         return JSONResponse(
             status_code=200,
-            content={"success": True, "message": "Ограничения сохранены"}
+            content={"success": True, "message": "Глобальные ограничения сохранены"}
         )
     except Exception as e:
-        print(f"❌ Ошибка сохранения ограничений: {e}")
+        print(f"❌ Ошибка сохранения глобальных ограничений: {e}")
         raise HTTPException(status_code=400, detail=f"Ошибка сохранения ограничений: {str(e)}")
 
 
 @router.get("/api/negative-filters")
-async def get_negative_filters_api(group_id: int = Query(1, description="ID группы")):
-    """Получить все ограничения"""
+async def get_negative_filters_api():
+    """Получить ВСЕ глобальные ограничения"""
     try:
-        filters = await negative_filters_service.get_negative_filters(group_id)
+        filters = await negative_filters_service.get_negative_filters()
         return filters
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка получения ограничений: {str(e)}")
 
 
 @router.delete("/api/negative-filters/{teacher}")
-async def remove_negative_filter_api(
-        teacher: str,
-        group_id: int = Query(1, description="ID группы")
-):
-    """Удалить ограничения для преподавателя"""
+async def remove_negative_filter_api(teacher: str):
+    """Удалить ГЛОБАЛЬНЫЕ ограничения для преподавателя"""
     try:
-        await negative_filters_service.remove_negative_filter(teacher, group_id)
+        await negative_filters_service.remove_negative_filter(teacher)
         return JSONResponse(
             status_code=200,
-            content={"success": True, "message": "Ограничения удалены"}
+            content={"success": True, "message": "Глобальные ограничения удалены"}
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Ошибка удаления ограничений: {str(e)}")
 
 
-# Старый эндпоинт для обратной совместимости (HTML формы)
-@router.post("/add-negative-filter")
-async def add_negative_filter_old(
-        teacher: str = Form(...),
-        restricted_days: List[int] = Form([]),
-        restricted_slots: List[int] = Form([])
-):
-    """Старый эндпоинт для обратной совместимости"""
+# Старый эндпоинт для обратной совместимости
+@router.get("/api/negative-filters/by-group/{group_id}")
+async def get_negative_filters_by_group_api(group_id: int):
+    """Устаревший эндпоинт для обратной совместимости (теперь фильтры глобальные)"""
     try:
-        print(f"📨 Старый формат: teacher={teacher}, days={restricted_days}, slots={restricted_slots}")
-
-        await negative_filters_service.save_negative_filter(teacher, restricted_days, restricted_slots)
-        return RedirectResponse(url="/", status_code=303)
+        filters = await negative_filters_service.get_negative_filters()
+        return filters
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Ошибка сохранения фильтра: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Ошибка получения ограничений: {str(e)}")

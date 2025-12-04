@@ -138,16 +138,15 @@ class Database:
                     )
                 ''')
 
-                # Таблица фильтров - С group_id (НО МОЖНО ИСПОЛЬЗОВАТЬ ГЛОБАЛЬНО)
+                # Таблица фильтров - БЕЗ group_id (ГЛОБАЛЬНЫЕ)
                 await conn.execute('''
-                    CREATE TABLE negative_filters (
-                        teacher TEXT PRIMARY KEY,
-                        restricted_days TEXT DEFAULT '[]',
-                        restricted_slots TEXT DEFAULT '[]',
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        group_id INTEGER DEFAULT 1
-                    )
-                ''')
+                            CREATE TABLE negative_filters (
+                                teacher TEXT PRIMARY KEY,
+                                restricted_days TEXT DEFAULT '[]',
+                                restricted_slots TEXT DEFAULT '[]',
+                                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            )
+                        ''')
 
                 # Таблица сохраненных расписаний - С group_id
                 await conn.execute('''

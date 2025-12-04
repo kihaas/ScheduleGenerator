@@ -2,43 +2,37 @@
 chcp 65001 > nul
 title Schedule Generator Server
 
-echo Starting Schedule Generator Server...
+echo ========================================
+echo       SCHEDULE GENERATOR SERVER
+echo ========================================
 echo.
 
-REM Переходим в корневую директорию проекта
-cd /d "%~dp0"
-
-REM Проверяем существование Python
-if not exist "python\python.exe" (
+REM Проверяем Python
+python --version >nul 2>&1
+if errorlevel 1 (
     echo ERROR: Python not found!
-    echo Expected path: %~dp0python\python.exe
-    echo.
-    echo Please download Python portable and extract to "python\" folder
-    echo Download from: https://www.python.org/downloads/
+    echo Please run install.bat first
     pause
     exit /b 1
 )
 
-REM Проверяем существование основного файла приложения
-if not exist "app\main.py" (
-    echo ERROR: Main application file not found!
-    echo Expected path: %~dp0app\main.py
-    echo.
-    echo Current directory: %CD%
-    echo Files in app directory:
-    dir app /b
+REM Проверяем зависимости
+python -c "import fastapi, uvicorn, jinja2, sqlalchemy, aiosqlite, pydantic" >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: Dependencies missing!
+    echo Please run install.bat first
     pause
     exit /b 1
 )
 
-echo Python path: %~dp0python\python.exe
-echo App path: %~dp0app\main.py
+echo.
+echo Starting server in PRODUCTION mode...
+echo Server will run at: http://127.0.0.1:8000
+echo Press Ctrl+C to stop
 echo.
 
-REM Запускаем сервер через portable python
-REM Используем рабочий каталог корень проекта, а app как модуль
-cd /d "%~dp0"
-python\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --log-level info --reload
+REM Запускаем сервер без autoreload
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --log-level info
 
 echo.
 echo Server stopped.
