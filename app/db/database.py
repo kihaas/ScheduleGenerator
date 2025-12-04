@@ -186,48 +186,75 @@ class Database:
                 await conn.close()
 
     async def _migrate_to_new_architecture(self, conn):
-        """Миграция на новую архитектуру (преподаватели глобальные)"""
+        """Миграция на новую архитектуру (фильтры глобальные)"""
         try:
-            # 1. Убираем group_id из teachers если есть
-            columns = await conn.execute("PRAGMA table_info(teachers)")
-            column_names = [col[1] for col in await columns.fetchall()]
+            print("🔄 Проверяем миграцию фильтров...")
+
+            # Проверяем есть ли group_id в negative_filters
+            columns = await conn.execute("PRAGMA table_info(negative_filters)")
+            column_info = await columns.fetchall()
+            column_names = [col[1] for col in column_info]
+
+            print(f"📊 Колонки negative_filters: {column_names}")
 
             if 'group_id' in column_names:
-                print("🔄 Миграция: убираем group_id из teachers...")
+                print("🔄 Миграция: делаем фильтры глобальными...")
 
-                # Создаем временную таблицу без group_id
+                # 1. Создаем временную таблицу с текущими данными
                 await conn.execute('''
-                    CREATE TABLE teachers_new (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        name TEXT NOT NULL UNIQUE,
+                    CREATE TABLE temp_negative_filters AS 
+                    SELECT DISTINCT teacher, restricted_days, restricted_slots, created_at 
+                    FROM negative_filters 
+                    WHERE teacher IS NOT NULL
+                ''')
+
+                # 2. Удаляем старую таблицу
+                await conn.execute('DROP TABLE negative_filters')
+
+                # 3. Создаем новую таблицу без group_id
+                await conn.execute('''
+                    CREATE TABLE negative_filters (
+                        teacher TEXT PRIMARY KEY,
+                        restricted_days TEXT DEFAULT '[]',
+                        restricted_slots TEXT DEFAULT '[]',
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 ''')
 
-                # Копируем уникальных преподавателей
+                # 4. Копируем данные из временной таблицы
                 await conn.execute('''
-                    INSERT OR IGNORE INTO teachers_new (id, name, created_at)
-                    SELECT MIN(id), name, MIN(created_at) 
-                    FROM teachers 
-                    GROUP BY name
+                    INSERT OR REPLACE INTO negative_filters (teacher, restricted_days, restricted_slots, created_at)
+                    SELECT teacher, restricted_days, restricted_slots, created_at 
+                    FROM temp_negative_filters
                 ''')
 
-                # Удаляем старую таблицу
-                await conn.execute('DROP TABLE teachers')
+                # 5. Удаляем временную таблицу
+                await conn.execute('DROP TABLE temp_negative_filters')
 
-                # Переименовываем новую таблицу
-                await conn.execute('ALTER TABLE teachers_new RENAME TO teachers')
+                await conn.commit()
+                print("✅ Фильтры успешно мигрированы в глобальную таблицу")
+            else:
+                print("✅ Таблица negative_filters уже глобальная")
 
-                print("✅ Преподаватели мигрированы в глобальную таблицу")
+            # 6. Проверяем остальные таблицы
+            print("🔄 Проверяем другие таблицы...")
 
-            # 2. Добавляем недостающие индексы
-            await conn.execute('CREATE INDEX IF NOT EXISTS idx_group_id_subjects ON subjects(group_id)')
-            await conn.execute('CREATE INDEX IF NOT EXISTS idx_group_id_lessons ON lessons(group_id)')
+            # Проверяем subjects
+            subjects_columns = await conn.execute("PRAGMA table_info(subjects)")
+            subs_cols = [col[1] for col in await subjects_columns.fetchall()]
+            print(f"📊 Колонки subjects: {subs_cols}")
 
-            print("✅ Миграция завершена")
+            # Проверяем lessons
+            lessons_columns = await conn.execute("PRAGMA table_info(lessons)")
+            less_cols = [col[1] for col in await lessons_columns.fetchall()]
+            print(f"📊 Колонки lessons: {less_cols}")
+
+            print("✅ Миграция проверена")
 
         except Exception as e:
             print(f"⚠️ Ошибка миграции: {e}")
+            import traceback
+            print(f"⚠️ Traceback: {traceback.format_exc()}")
 
 
 # Глобальный экземпляр базы данных

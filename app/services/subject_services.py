@@ -99,38 +99,35 @@ class SubjectService:
         )
         return result.rowcount > 0
 
-    async def get_negative_filters(self, group_id: int = 1):
-        """Получить ограничения для группы (можно сделать глобальными или локальными)"""
-        # Здесь можно сделать глобальные фильтры (убрать group_id из WHERE)
-        # Или локальные (оставить group_id)
+    async def get_negative_filters(self, group_id=None):  # Добавляем необязательный параметр
+        """Получить ГЛОБАЛЬНЫЕ ограничения"""
+        try:
+            # Игнорируем group_id если передан, но используем глобальные фильтры
+            if group_id is not None:
+                print(f"⚠️  Внимание: get_negative_filters вызван с group_id={group_id}, но фильтры глобальные")
 
-        # ВАРИАНТ 1: ГЛОБАЛЬНЫЕ ФИЛЬТРЫ (рекомендуется)
-        # rows = await database.fetch_all(
-        #     'SELECT teacher, restricted_days, restricted_slots FROM negative_filters'
-        # )
+            rows = await database.fetch_all(
+                'SELECT teacher, restricted_days, restricted_slots FROM negative_filters'
+            )
 
-        # ВАРИАНТ 2: ЛОКАЛЬНЫЕ ФИЛЬТРЫ ДЛЯ ГРУППЫ
-        rows = await database.fetch_all(
-            'SELECT teacher, restricted_days, restricted_slots FROM negative_filters WHERE group_id = ?',
-            (group_id,)
-        )
+            filters = {}
+            for row in rows:
+                teacher, days_json, slots_json = row
+                try:
+                    filters[teacher] = {
+                        "restricted_days": json.loads(days_json) if days_json else [],
+                        "restricted_slots": json.loads(slots_json) if slots_json else []
+                    }
+                except:
+                    filters[teacher] = {
+                        "restricted_days": [],
+                        "restricted_slots": []
+                    }
 
-        filters = {}
-        for row in rows:
-            teacher, days_json, slots_json = row
-            try:
-                restricted_days = json.loads(days_json) if days_json else []
-                restricted_slots = json.loads(slots_json) if slots_json else []
-            except:
-                restricted_days = []
-                restricted_slots = []
-
-            filters[teacher] = {
-                "restricted_days": restricted_days,
-                "restricted_slots": restricted_slots
-            }
-
-        return filters
+            return filters
+        except Exception as e:
+            print(f"❌ Ошибка получения глобальных фильтров: {e}")
+            return {}
 
     async def update_subject_hours(self, subject_id: int, consumed_hours: int) -> bool:
         """Обновить оставшиеся часы предмета (при добавлении в расписание)"""

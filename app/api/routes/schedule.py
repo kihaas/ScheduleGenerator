@@ -27,9 +27,10 @@ async def generate_schedule_for_group(group_id: int = Query(1, description="ID �
         subjects = await schedule_generator.get_subjects_for_group(group_id)
         print(f"📚 Найдено предметов в группе {group_id}: {len(subjects)}")
 
-        # Получаем ограничения для группы
-        negative_filters = await negative_filters_service.get_negative_filters_for_group(group_id)
-        print(f"🎯 Ограничений для группы {group_id}: {len(negative_filters)}")
+        # Получаем ГЛОБАЛЬНЫЕ ограничения
+        from app.services.negative_filters_service import negative_filters_service
+        negative_filters = await negative_filters_service.get_negative_filters()  # БЕЗ group_id
+        print(f"🎯 Глобальных ограничений: {len(negative_filters)}")
 
         # Очищаем текущее расписание для этой группы
         await schedule_service.clear_schedule_for_group(group_id)

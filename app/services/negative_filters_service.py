@@ -20,6 +20,7 @@ class NegativeFiltersService:
     async def get_negative_filters(self) -> Dict:
         """Получить ВСЕ глобальные ограничения"""
         try:
+            # ПРЯМОЙ запрос без group_id
             rows = await database.fetch_all(
                 'SELECT teacher, restricted_days, restricted_slots FROM negative_filters'
             )
@@ -43,6 +44,7 @@ class NegativeFiltersService:
             return filters
         except Exception as e:
             print(f"❌ Ошибка получения глобальных ограничений: {e}")
+            # Возвращаем пустой словарь в случае ошибки
             return {}
 
     async def get_teacher_filters(self, teacher: str) -> Optional[Dict]:

@@ -40,10 +40,22 @@ async def get_negative_filters_api():
     """Получить ВСЕ глобальные ограничения"""
     try:
         filters = await negative_filters_service.get_negative_filters()
+        print(f"✅ API: Отправлено {len(filters)} глобальных фильтров")
+        return filters
+    except Exception as e:
+        print(f"❌ API Ошибка получения ограничений: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка получения ограничений: {str(e)}")
+
+# Для обратной совместимости с фронтендом, который может передавать group_id
+@router.get("/api/negative-filters/by-group/{group_id}")
+async def get_negative_filters_by_group_api(group_id: int):
+    """Устаревший эндпоинт - теперь возвращает глобальные фильтры"""
+    try:
+        filters = await negative_filters_service.get_negative_filters()
+        print(f"✅ API (group_id={group_id}): Отправлено {len(filters)} глобальных фильтров")
         return filters
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка получения ограничений: {str(e)}")
-
 
 @router.delete("/api/negative-filters/{teacher}")
 async def remove_negative_filter_api(teacher: str):
@@ -58,12 +70,3 @@ async def remove_negative_filter_api(teacher: str):
         raise HTTPException(status_code=400, detail=f"Ошибка удаления ограничений: {str(e)}")
 
 
-# Старый эндпоинт для обратной совместимости
-@router.get("/api/negative-filters/by-group/{group_id}")
-async def get_negative_filters_by_group_api(group_id: int):
-    """Устаревший эндпоинт для обратной совместимости (теперь фильтры глобальные)"""
-    try:
-        filters = await negative_filters_service.get_negative_filters()
-        return filters
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка получения ограничений: {str(e)}")

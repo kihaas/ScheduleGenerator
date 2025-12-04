@@ -26,14 +26,14 @@ class ScheduleGenerator:
             print("❌ Нет предметов для генерации")
             return []
 
-        # Получаем фильтры для группы
-        negative_filters = await subject_service.get_negative_filters(group_id)
-        print(f"🎯 Ограничений для группы {group_id}: {len(negative_filters)}")
+        # Получаем ГЛОБАЛЬНЫЕ фильтры
+        negative_filters = await subject_service.get_negative_filters()  # БЕЗ group_id
+        print(f"🎯 Глобальных ограничений: {len(negative_filters)}")
 
         # Генерируем расписание с проверкой конфликтов
         lessons = await self.generate(subjects, negative_filters, group_id)
 
-        # Очищаем старые уроки группы (часы восстановятся автоматически)
+        # Очищаем старые уроки группы
         await database.execute(
             'DELETE FROM lessons WHERE group_id = ?',
             (group_id,)
@@ -46,17 +46,7 @@ class ScheduleGenerator:
                 (lesson.day, lesson.time_slot, lesson.teacher, lesson.subject_name, int(lesson.editable), group_id)
             )
 
-        # ОБНОВЛЯЕМ ЧАСЫ ПРЕДМЕТОВ ПОСЛЕ ГЕНЕРАЦИИ
-        # Сначала сбрасываем часы к исходным значениям
-        await database.execute(
-            '''UPDATE subjects 
-               SET remaining_hours = total_hours,
-                   remaining_pairs = total_hours / 2 
-               WHERE group_id = ?''',
-            (group_id,)
-        )
-
-        # Затем вычитаем часы для сгенерированных уроков
+        # Обновляем часы предметов
         for lesson in lessons:
             await database.execute(
                 '''UPDATE subjects 
@@ -69,6 +59,10 @@ class ScheduleGenerator:
         print(f"✅ Сгенерировано уроков для группы {group_id}: {len(lessons)}")
 
         return lessons
+
+    async def get_subjects_for_group(self, group_id: int) -> List[Subject]:
+        """Получить предметы для конкретной группы"""
+        return await subject_service.get_all_subjects(group_id)
 
     async def generate(self, subjects: List[Subject], negative_filters: Dict, group_id: int = 1) -> List[Lesson]:
         """Сгенерировать расписание для группы с проверкой конфликтов между группами"""
