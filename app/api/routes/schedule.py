@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, Form, HTTPException, Query
 from fastapi.responses import RedirectResponse
 from starlette.responses import JSONResponse
 
-from app.db import database
+from app.db.database import database
 from app.services.schedule_services import schedule_service
 from app.services.shedule_generator import schedule_generator
 from app.services.negative_filters_service import negative_filters_service
@@ -55,65 +55,34 @@ async def clear_all_data(group_id: int = Query(1, description="ID группы")
     try:
         print(f"🧹 Очистка всех данных группы {group_id}")
 
-        # 1. ВОССТАНАВЛИВАЕМ часы для всех уроков группы
-        lessons = await database.fetch_all(
-            'SELECT id, teacher, subject_name FROM lessons WHERE group_id = ?',
-            (group_id,)
-        )
+        # Используем прямой SQL подход
+        import aiosqlite
+        from pathlib import Path
 
-        print(f"📊 Найдено уроков для очистки: {len(lessons)}")
+        db_path = Path("schedule.sql")
 
-        for lesson in lessons:
-            lesson_id, teacher, subject_name = lesson
+        async with aiosqlite.connect(db_path) as conn:
+            await conn.execute("PRAGMA foreign_keys = ON")
 
-            # Находим предмет
-            subject = await database.fetch_one(
-                'SELECT id, remaining_hours, total_hours FROM subjects WHERE teacher = ? AND subject_name = ? AND group_id = ?',
-                (teacher, subject_name, group_id)
-            )
-
-            if subject:
-                subject_id, remaining_hours, total_hours = subject
-                # Каждая пара = 2 часа, возвращаем их
-                hours_to_restore = 2
-                new_hours = min(remaining_hours + hours_to_restore, total_hours)
-                new_pairs = new_hours // 2
-
-                # Обновляем предмет
-                await database.execute(
-                    '''UPDATE subjects 
-                       SET remaining_hours = ?,
-                           remaining_pairs = ?
-                       WHERE id = ?''',
-                    (new_hours, new_pairs, subject_id)
-                )
-                print(f"✅ Восстановлено 2 часа для предмета {subject_id}")
-
-        # 2. Удаляем все уроки группы
-        deleted_count = await database.execute(
-            'DELETE FROM lessons WHERE group_id = ?',
-            (group_id,)
-        )
-
-        # 3. Полностью сбрасываем часы предметов к исходным значениям
-        subjects = await database.fetch_all(
-            'SELECT id, total_hours FROM subjects WHERE group_id = ?',
-            (group_id,)
-        )
-
-        for subject in subjects:
-            subject_id, total_hours = subject
-            remaining_pairs = total_hours // 2
-
-            await database.execute(
+            # 1. Восстанавливаем часы для всех предметов группы
+            await conn.execute(
                 '''UPDATE subjects 
-                   SET remaining_hours = ?,
-                       remaining_pairs = ?
-                   WHERE id = ?''',
-                (total_hours, remaining_pairs, subject_id)
+                   SET remaining_hours = total_hours,
+                       remaining_pairs = total_hours / 2 
+                   WHERE group_id = ?''',
+                (group_id,)
             )
 
-        print(f"✅ Удалено уроков: {deleted_count.rowcount}")
+            # 2. Удаляем все уроки группы
+            cursor = await conn.execute(
+                'DELETE FROM lessons WHERE group_id = ?',
+                (group_id,)
+            )
+            deleted_count = cursor.rowcount
+
+            await conn.commit()
+
+        print(f"✅ Очищено данных группы {group_id}: удалено {deleted_count} уроков")
 
         return JSONResponse(
             status_code=200,
@@ -125,6 +94,4 @@ async def clear_all_data(group_id: int = Query(1, description="ID группы")
         import traceback
         print(f"❌ Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Ошибка очистки данных: {str(e)}")
-
-
 

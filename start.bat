@@ -43,8 +43,9 @@ echo Waiting 3 seconds for server to start...
 timeout /t 3 /nobreak > nul
 
 REM Проверяем запустился ли сервер
-powershell -Command "try { $response = Invoke-WebRequest -Uri 'http://127.0.0.1:8000/health' -TimeoutSec 2 -ErrorAction Stop; if ($response.StatusCode -eq 200) { exit 0 } } catch { exit 1 }"
-if %errorlevel% equ 0 (
+REM Проверяем запустился ли сервер
+REM Проверяем запустился ли сервер
+powershell -Command "try { $response = Invoke-WebRequest -Uri 'http://127.0.0.1:8000/health' -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop; if ($response.StatusCode -eq 200) { exit 0 } } catch { exit 1 }"
     echo Server started successfully!
     echo.
     echo Opening browser...

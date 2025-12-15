@@ -16,7 +16,7 @@ set attempt=1
 :check_server
 echo Attempt %attempt%/%max_attempts%...
 
-powershell -Command "try { $response = Invoke-WebRequest -Uri 'http://127.0.0.1:8000/health' -TimeoutSec 2 -ErrorAction Stop; if ($response.StatusCode -eq 200) { exit 0 } } catch { exit 1 }"
+powershell -Command "try { $response = Invoke-WebRequest -Uri 'http://127.0.0.1:8000/health' -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop; if ($response.StatusCode -eq 200) { exit 0 } } catch { exit 1 }"
 if %errorlevel% equ 0 (
     echo Server is running!
     goto open_browser

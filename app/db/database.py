@@ -16,22 +16,7 @@ class Database:
         await conn.execute("PRAGMA foreign_keys = ON")
         return conn
 
-    async def execute(self, query: str, params: tuple = None):
-        """Выполнить запрос"""
-        conn = await self._get_connection()
-        try:
-            if params:
-                result = await conn.execute(query, params)
-            else:
-                result = await conn.execute(query)
-            await conn.commit()
-            return result
-        except Exception as e:
-            await conn.rollback()
-            raise e
-        finally:
-            await conn.close()
-
+    # В class Database добавьте:
     async def fetch_all(self, query: str, params: tuple = None):
         """Получить все строки"""
         conn = await self._get_connection()
@@ -60,6 +45,22 @@ class Database:
             await cursor.close()
             return row
         except Exception as e:
+            raise e
+        finally:
+            await conn.close()
+
+    async def execute(self, query: str, params: tuple = None):
+        """Выполнить запрос"""
+        conn = await self._get_connection()
+        try:
+            if params:
+                result = await conn.execute(query, params)
+            else:
+                result = await conn.execute(query)
+            await conn.commit()
+            return result
+        except Exception as e:
+            await conn.rollback()
             raise e
         finally:
             await conn.close()
