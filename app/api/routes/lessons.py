@@ -40,9 +40,20 @@ async def get_all_lessons(group_id: int = Query(1, description="ID группы"
         )
 
 
+# @router.post("/remove-lesson")
+# async def remove_lesson_old(day: int = Form(...), time_slot: int = Form(...)):
+#     """Старый эндпоинт для обратной совместимости (HTML формы)"""
+#     try:
+#         success = await schedule_service.remove_lesson(day, time_slot)
+#         if not success:
+#             raise HTTPException(status_code=404, detail="Lesson not found")
+#         return RedirectResponse(url="/", status_code=303)
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/remove-lesson")
-async def remove_lesson_old(day: int = Form(...), time_slot: int = Form(...)):
-    """Старый эндпоинт для обратной совместимости (HTML формы)"""
+async def remove_lesson(day: int = Form(...), time_slot: int = Form(...)):
     try:
         success = await schedule_service.remove_lesson(day, time_slot)
         if not success:

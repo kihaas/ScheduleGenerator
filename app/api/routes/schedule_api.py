@@ -254,3 +254,4 @@ async def check_teacher_availability(
             status_code=500,
             detail=f"Ошибка проверки доступности: {str(e)}"
         )
+

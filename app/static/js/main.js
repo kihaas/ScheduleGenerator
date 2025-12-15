@@ -1011,6 +1011,33 @@ class ScheduleApp {
         }
     }
 
+    async fixHoursCalculation() {
+    if (!confirm('Пересчитать и исправить все часы для текущей группы?')) return;
+
+    this.showLoading();
+
+    try {
+        const response = await fetch(`/api/statistics/fix-hours?group_id=${this.currentGroupId}`, {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            this.showSuccess(result.message);
+
+            // Перезагружаем все данные
+            await this.refreshAllData();
+        } else {
+            const result = await response.json();
+            throw new Error(result.detail || 'Ошибка исправления часов');
+        }
+    } catch (error) {
+        this.showError('Ошибка исправления часов: ' + error.message);
+    } finally {
+        this.hideLoading();
+    }
+}
+
     async clearAllData() {
         if (!confirm('ВНИМАНИЕ! Это действие удалит все данные текущей группы. Продолжить?')) return;
 

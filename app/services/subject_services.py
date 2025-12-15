@@ -129,17 +129,51 @@ class SubjectService:
             print(f"❌ Ошибка получения глобальных фильтров: {e}")
             return {}
 
-    async def update_subject_hours(self, subject_id: int, consumed_hours: int) -> bool:
-        """Обновить оставшиеся часы предмета (при добавлении в расписание)"""
+    async def update_subject_hours(self, subject_id: int, delta_hours: int) -> bool:
+        """Обновить оставшиеся часы предмета (дельта может быть положительной или отрицательной)"""
         try:
+            print(f"🔄 Обновление часов предмета {subject_id}: delta={delta_hours}")
+
+            # СНАЧАЛА получаем текущие значения
+            subject = await database.fetch_one(
+                'SELECT remaining_hours, total_hours FROM subjects WHERE id = ?',
+                (subject_id,)
+            )
+
+            if not subject:
+                print(f"❌ Предмет {subject_id} не найден")
+                return False
+
+            current_hours = subject[0]
+            total_hours = subject[1]
+
+            # Вычисляем новые значения
+            new_hours = current_hours - delta_hours  # delta_hours положительный = заняли пару
+
+            # Проверяем границы
+            if new_hours < 0:
+                new_hours = 0
+            if new_hours > total_hours:
+                new_hours = total_hours
+
+            # Вычисляем пары (1 пара = 2 часа)
+            new_pairs = new_hours // 2
+
+            print(f"📊 Текущие: {current_hours}ч, Новые: {new_hours}ч, Пар: {new_pairs}")
+
+            # Обновляем БД
             result = await database.execute(
                 '''UPDATE subjects 
-                   SET remaining_hours = remaining_hours - ?, 
-                       remaining_pairs = (remaining_hours - ?) / 2 
-                   WHERE id = ? AND remaining_hours >= ?''',
-                (consumed_hours, consumed_hours, subject_id, consumed_hours)
+                   SET remaining_hours = ?,
+                       remaining_pairs = ?
+                   WHERE id = ?''',
+                (new_hours, new_pairs, subject_id)
             )
-            return result.rowcount > 0
+
+            if result.rowcount > 0:
+                print(f"✅ Часы обновлены: {new_hours}ч, {new_pairs} пар")
+                return True
+            return False
         except Exception as e:
             print(f"❌ Ошибка обновления часов предмета {subject_id}: {e}")
             return False

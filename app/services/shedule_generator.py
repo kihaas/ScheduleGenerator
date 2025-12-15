@@ -14,51 +14,6 @@ class ScheduleGenerator:
     def __init__(self):
         self.occupied_slots = set()
 
-    async def generate_schedule(self, group_id: int = 1) -> List[Lesson]:
-        """Генерация расписания для конкретной группы"""
-        print(f"🔄 Начинаем генерацию расписания для группы {group_id}...")
-
-        # Получаем предметы для конкретной группы
-        subjects = await subject_service.get_all_subjects(group_id)
-        print(f"📚 Найдено предметов в группе {group_id}: {len(subjects)}")
-
-        if not subjects:
-            print("❌ Нет предметов для генерации")
-            return []
-
-        # Получаем ГЛОБАЛЬНЫЕ фильтры
-        negative_filters = await subject_service.get_negative_filters()  # БЕЗ group_id
-        print(f"🎯 Глобальных ограничений: {len(negative_filters)}")
-
-        # Генерируем расписание с проверкой конфликтов
-        lessons = await self.generate(subjects, negative_filters, group_id)
-
-        # Очищаем старые уроки группы
-        await database.execute(
-            'DELETE FROM lessons WHERE group_id = ?',
-            (group_id,)
-        )
-
-        # Сохраняем уроки
-        for lesson in lessons:
-            await database.execute(
-                'INSERT INTO lessons (day, time_slot, teacher, subject_name, editable, group_id) VALUES (?, ?, ?, ?, ?, ?)',
-                (lesson.day, lesson.time_slot, lesson.teacher, lesson.subject_name, int(lesson.editable), group_id)
-            )
-
-        # Обновляем часы предметов
-        for lesson in lessons:
-            await database.execute(
-                '''UPDATE subjects 
-                   SET remaining_hours = remaining_hours - 2, 
-                       remaining_pairs = remaining_pairs - 1 
-                   WHERE teacher = ? AND subject_name = ? AND group_id = ?''',
-                (lesson.teacher, lesson.subject_name, group_id)
-            )
-
-        print(f"✅ Сгенерировано уроков для группы {group_id}: {len(lessons)}")
-
-        return lessons
 
     async def get_subjects_for_group(self, group_id: int) -> List[Subject]:
         """Получить предметы для конкретной группы"""
@@ -67,86 +22,116 @@ class ScheduleGenerator:
     async def generate(self, subjects: List[Subject], negative_filters: Dict, group_id: int = 1) -> List[Lesson]:
         """Сгенерировать расписание для группы с проверкой конфликтов между группами"""
         print(f"🎯 Генерация расписания для группы {group_id}")
-        print(f"📚 Предметов: {len(subjects)}, Ограничений: {len(negative_filters)}")
+        print(f"📚 Предметов: {len(subjects)}")
 
         lessons = []
         days = [0, 1, 2, 3, 4]  # Пн-Пт
         time_slots = [0, 1, 2, 3]  # 4 пары в день
 
-        # Сортируем предметы по приоритету (сначала высокий приоритет)
-        sorted_subjects = sorted(subjects, key=lambda x: x.priority, reverse=True)
+        # Создаем копии предметов для отслеживания
+        subject_pool = []
+        for subject in subjects:
+            # Проверяем что есть пары для распределения
+            if subject.remaining_pairs > 0:
+                for _ in range(subject.remaining_pairs):
+                    subject_pool.append({
+                        'id': subject.id,
+                        'teacher': subject.teacher,
+                        'subject_name': subject.subject_name,
+                        'max_per_day': subject.max_per_day,
+                        'priority': subject.priority
+                    })
 
-        # Создаем копию для отслеживания оставшихся пар
-        remaining_subjects = []
-        for subject in sorted_subjects:
-            for _ in range(subject.remaining_pairs):
-                remaining_subjects.append(subject)
+        print(f"📊 Всего пар для распределения: {len(subject_pool)}")
 
-        random.shuffle(remaining_subjects)
+        if not subject_pool:
+            print("⚠️ Нет пар для распределения")
+            return []
 
-        # Словарь для отслеживания распределенных часов
-        hours_allocated = {}
+        random.shuffle(subject_pool)
+
+        # Словарь для отслеживания использования в день
+        daily_usage = {}
 
         # Заполняем расписание
         for day in days:
-            daily_subjects = {}  # Для отслеживания max_per_day
+            daily_usage[day] = {}
 
             for time_slot in time_slots:
-                if not remaining_subjects:
+                if not subject_pool:
                     break
 
-                # Пытаемся найти подходящий предмет
-                subject_found = None
-                subject_index = -1
+                # Ищем подходящий предмет
+                found_index = -1
 
-                for i, subject in enumerate(remaining_subjects):
-                    teacher = subject.teacher
+                for i, subject in enumerate(subject_pool):
+                    teacher = subject['teacher']
+                    subject_name = subject['subject_name']
+                    key = f"{teacher}_{subject_name}"
 
-                    # Проверяем локальные ограничения преподавателя
+                    # Проверяем max_per_day
+                    if key in daily_usage[day]:
+                        if daily_usage[day][key] >= subject['max_per_day']:
+                            continue
+
+                    # Проверяем доступность преподавателя
                     if not self._is_teacher_available(teacher, day, time_slot, negative_filters):
                         continue
 
-                    # Проверяем max_per_day
-                    if subject.subject_name in daily_subjects:
-                        if daily_subjects[subject.subject_name] >= subject.max_per_day:
-                            continue
-
-                    # 🔥 ВАЖНО: Проверяем что преподаватель не занят в это время В ЛЮБОЙ ГРУППЕ
+                    # Проверяем что преподаватель не занят в других группах
                     if not await self._is_teacher_free_across_groups(teacher, day, time_slot, group_id):
-                        print(f"🚫 Преподаватель {teacher} занят в день {day}, слот {time_slot} в другой группе")
                         continue
 
-                    subject_found = subject
-                    subject_index = i
+                    found_index = i
                     break
 
-                if subject_found:
+                if found_index >= 0:
+                    subject = subject_pool.pop(found_index)
+                    teacher = subject['teacher']
+                    subject_name = subject['subject_name']
+                    key = f"{teacher}_{subject_name}"
+
                     # Создаем урок
                     lesson = Lesson(
                         day=day,
                         time_slot=time_slot,
-                        teacher=subject_found.teacher,
-                        subject_name=subject_found.subject_name,
+                        teacher=teacher,
+                        subject_name=subject_name,
                         editable=True
                     )
                     lessons.append(lesson)
 
-                    # Обновляем счетчики
-                    if subject_found.subject_name in daily_subjects:
-                        daily_subjects[subject_found.subject_name] += 1
+                    # Обновляем счетчик использования в день
+                    if key in daily_usage[day]:
+                        daily_usage[day][key] += 1
                     else:
-                        daily_subjects[subject_found.subject_name] = 1
-
-                    # Отмечаем выделенные часы
-                    key = (subject_found.teacher, subject_found.subject_name)
-                    hours_allocated[key] = hours_allocated.get(key, 0) + 2
-
-                    # Удаляем использованный предмет
-                    remaining_subjects.pop(subject_index)
+                        daily_usage[day][key] = 1
 
         print(f"✅ Сгенерировано уроков: {len(lessons)}")
-        print(f"📊 Осталось нераспределенных пар: {len(remaining_subjects)}")
-        print(f"📊 Распределено часов: {hours_allocated}")
+        print(f"📊 Осталось нераспределенных пар: {len(subject_pool)}")
+
+        from app.services.subject_services import subject_service
+
+        # Считаем сколько пар каждого предмета сгенерировано
+        subject_counts = {}
+        for lesson in lessons:
+            key = (lesson.teacher, lesson.subject_name)
+            subject_counts[key] = subject_counts.get(key, 0) + 1
+
+        # Вычитаем часы для каждого предмета
+        for (teacher, subject_name), pair_count in subject_counts.items():
+            # Находим ID предмета
+            subject = await database.fetch_one(
+                'SELECT id FROM subjects WHERE teacher = ? AND subject_name = ? AND group_id = ?',
+                (teacher, subject_name, group_id)
+            )
+            if subject:
+                subject_id = subject[0]
+                # Вычитаем часы (2 часа на пару * количество пар)
+                hours_to_subtract = pair_count * 2
+                success = await subject_service.update_subject_hours(subject_id, hours_to_subtract)
+                if success:
+                    print(f"✅ Вычтено {hours_to_subtract}ч для {teacher} - {subject_name}")
 
         return lessons
 

@@ -1145,3 +1145,15 @@ button {
     background: #334155 !important;
     color: white !important;
 }
+
+
+.btn-warning {
+    background: var(--warning);
+    color: white;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+}
+
+.btn-warning:hover {
+    background: #d97706;
+}
