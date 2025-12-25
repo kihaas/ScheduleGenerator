@@ -10,11 +10,11 @@ from app.db.models import Lesson
 router = APIRouter(tags=["lessons"])
 
 
-class UpdateLessonRequest(BaseModel):
-    day: int
-    time_slot: int
-    new_teacher: str
-    new_subject_name: str
+# class UpdateLessonRequest(BaseModel):
+#     day: int
+#     time_slot: int
+#     new_teacher: str
+#     new_subject_name: str
 
 
 class LessonResponse(BaseModel):
@@ -96,85 +96,85 @@ async def remove_lesson_api(
         )
 
 
-@router.patch("/api/lessons")
-async def update_lesson_api(
-        request: UpdateLessonRequest,
-        group_id: int = Query(1, description="ID группы")
-):
-    """Обновить урок (объединенная улучшенная версия)"""
-    try:
-        print("=" * 50)
-        print("🔄 ПОЛУЧЕН ЗАПРОС НА ОБНОВЛЕНИЕ УРОКА")
-        print(f"📥 Данные запроса: {request}")
-        print(f"📥 Day: {request.day} (type: {type(request.day)})")
-        print(f"📥 Time slot: {request.time_slot} (type: {type(request.time_slot)})")
-        print(f"📥 New teacher: '{request.new_teacher}'")
-        print(f"📥 New subject: '{request.new_subject_name}'")
-        print(f"📥 Group ID: {group_id}")
-
-        # Расширенная валидация
-        if not request.new_teacher or not request.new_subject_name:
-            print("❌ Валидация: не все поля заполнены")
-            raise HTTPException(status_code=400, detail="Заполните все поля")
-
-        cleaned_teacher = request.new_teacher.strip()
-        cleaned_subject = request.new_subject_name.strip()
-
-        if len(cleaned_teacher) < 1 or len(cleaned_subject) < 1:
-            print("❌ Валидация: поля пустые после trim")
-            raise HTTPException(status_code=400, detail="Поля не могут быть пустыми")
-
-        if len(cleaned_teacher) > 100 or len(cleaned_subject) > 100:
-            print("❌ Валидация: поля слишком длинные")
-            raise HTTPException(status_code=400, detail="Поля слишком длинные (макс. 100 символов)")
-
-        print("✅ Валидация пройдена, вызываем schedule_service.update_lesson...")
-
-        success = await schedule_service.update_lesson(
-            request.day,
-            request.time_slot,
-            cleaned_teacher,
-            cleaned_subject,
-            group_id
-        )
-
-        print(f"📤 Результат update_lesson: {success}")
-
-        if not success:
-            print("❌ Сервис вернул False")
-            raise HTTPException(
-                status_code=400,
-                detail="Не удалось обновить урок (возможно, урок не редактируемый или не найден, или преподаватель занят в это время)"
-            )
-
-        print("✅ Урок успешно обновлен!")
-        return JSONResponse(
-            status_code=200,
-            content={
-                "success": True,
-                "message": "Урок успешно обновлен",
-                "data": {
-                    "day": request.day,
-                    "time_slot": request.time_slot,
-                    "teacher": cleaned_teacher,
-                    "subject_name": cleaned_subject,
-                    "group_id": group_id
-                }
-            }
-        )
-
-    except HTTPException as he:
-        print(f"❌ HTTPException: {he.detail}")
-        raise he
-    except Exception as e:
-        print(f"💥 Неожиданная ошибка: {e}")
-        print(f"💥 Traceback: {traceback.format_exc()}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Внутренняя ошибка сервера при обновлении урока: {str(e)}"
-        )
-    finally:
-        print("=" * 50)
+# @router.patch("/api/lessons")
+# async def update_lesson_api(
+#         request: UpdateLessonRequest,
+#         group_id: int = Query(1, description="ID группы")
+# ):
+#     """Обновить урок (объединенная улучшенная версия)"""
+#     try:
+#         print("=" * 50)
+#         print("🔄 ПОЛУЧЕН ЗАПРОС НА ОБНОВЛЕНИЕ УРОКА")
+#         print(f"📥 Данные запроса: {request}")
+#         print(f"📥 Day: {request.day} (type: {type(request.day)})")
+#         print(f"📥 Time slot: {request.time_slot} (type: {type(request.time_slot)})")
+#         print(f"📥 New teacher: '{request.new_teacher}'")
+#         print(f"📥 New subject: '{request.new_subject_name}'")
+#         print(f"📥 Group ID: {group_id}")
+#
+#         # Расширенная валидация
+#         if not request.new_teacher or not request.new_subject_name:
+#             print("❌ Валидация: не все поля заполнены")
+#             raise HTTPException(status_code=400, detail="Заполните все поля")
+#
+#         cleaned_teacher = request.new_teacher.strip()
+#         cleaned_subject = request.new_subject_name.strip()
+#
+#         if len(cleaned_teacher) < 1 or len(cleaned_subject) < 1:
+#             print("❌ Валидация: поля пустые после trim")
+#             raise HTTPException(status_code=400, detail="Поля не могут быть пустыми")
+#
+#         if len(cleaned_teacher) > 100 or len(cleaned_subject) > 100:
+#             print("❌ Валидация: поля слишком длинные")
+#             raise HTTPException(status_code=400, detail="Поля слишком длинные (макс. 100 символов)")
+#
+#         print("✅ Валидация пройдена, вызываем schedule_service.update_lesson...")
+#
+#         success = await schedule_service.update_lesson(
+#             request.day,
+#             request.time_slot,
+#             cleaned_teacher,
+#             cleaned_subject,
+#             group_id
+#         )
+#
+#         print(f"📤 Результат update_lesson: {success}")
+#
+#         if not success:
+#             print("❌ Сервис вернул False")
+#             raise HTTPException(
+#                 status_code=400,
+#                 detail="Не удалось обновить урок (возможно, урок не редактируемый или не найден, или преподаватель занят в это время)"
+#             )
+#
+#         print("✅ Урок успешно обновлен!")
+#         return JSONResponse(
+#             status_code=200,
+#             content={
+#                 "success": True,
+#                 "message": "Урок успешно обновлен",
+#                 "data": {
+#                     "day": request.day,
+#                     "time_slot": request.time_slot,
+#                     "teacher": cleaned_teacher,
+#                     "subject_name": cleaned_subject,
+#                     "group_id": group_id
+#                 }
+#             }
+#         )
+#
+#     except HTTPException as he:
+#         print(f"❌ HTTPException: {he.detail}")
+#         raise he
+#     except Exception as e:
+#         print(f"💥 Неожиданная ошибка: {e}")
+#         print(f"💥 Traceback: {traceback.format_exc()}")
+#         raise HTTPException(
+#             status_code=500,
+#             detail=f"Внутренняя ошибка сервера при обновлении урока: {str(e)}"
+#         )
+#     finally:
+#         print("=" * 50)
 
 
 @router.post("/update-lesson")

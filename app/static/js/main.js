@@ -2,6 +2,7 @@
 class ScheduleApp {
     constructor() {
         this.currentLesson = null;
+        this.currentSlot = null; // Добавлено для пустых ячеек
         this.teachers = [];
         this.subjects = [];
         this.lessons = [];
@@ -69,7 +70,7 @@ class ScheduleApp {
         });
 
         document.getElementById('fullGenerate').addEventListener('click', () => {
-            this.generateSchedule();
+            app.generateSchedule();  // Теперь это будет использовать квоты если они заданы
         });
 
         document.getElementById('clearAll').addEventListener('click', () => {
@@ -78,9 +79,15 @@ class ScheduleApp {
 
         // Context menu
         document.addEventListener('contextmenu', (e) => {
-            if (e.target.closest('.schedule-cell') && e.target.closest('.lesson-card')) {
-                e.preventDefault();
-                this.showContextMenu(e);
+            e.preventDefault();
+            const cell = e.target.closest('.schedule-cell');
+            if (cell) {
+                const hasLesson = cell.querySelector('.lesson-card');
+                if (hasLesson) {
+                    this.showLessonContextMenu(e, cell);
+                } else {
+                    this.showEmptyCellContextMenu(e, cell);
+                }
             }
         });
 
@@ -106,19 +113,28 @@ class ScheduleApp {
         [closeBtn, cancelBtn].forEach(btn => {
             btn.addEventListener('click', () => {
                 replaceModal.style.display = 'none';
+                this.resetReplaceModal();
             });
         });
 
-        confirmBtn.addEventListener('click', () => {
-            this.replaceLesson();
-        });
+        // Confirm button будет менять свою функцию динамически
+        // Инициализация будет в showAddLessonModal
 
         // Close modal on outside click
         replaceModal.addEventListener('click', (e) => {
             if (e.target === replaceModal) {
                 replaceModal.style.display = 'none';
+                this.resetReplaceModal();
             }
         });
+    }
+
+    resetReplaceModal() {
+        const form = document.getElementById('replaceForm');
+        form.reset();
+        document.getElementById('selectedSubjectInfo').style.display = 'none';
+        this.currentLesson = null;
+        this.currentSlot = null;
     }
 
     setupThemeToggle() {
@@ -329,41 +345,49 @@ class ScheduleApp {
     }
 
     async deleteCurrentGroup() {
-        if (this.currentGroupId === 1) {
-            this.showError('Нельзя удалить основную группу');
-            return;
-        }
-
-        const groupName = this.getCurrentGroupName();
-        if (!confirm(`Удалить группу "${groupName}" и ВСЕ её данные (предметы, расписание)?`)) return;
-
-        this.showLoading();
-
-        try {
-            const response = await fetch(`/api/groups/${this.currentGroupId}`, {
-                method: 'DELETE'
-            });
-
-            if (response.ok) {
-                this.showSuccess(`Группа "${groupName}" удалена`);
-
-                // Переключаемся на основную группу
-                this.currentGroupId = 1;
-                localStorage.setItem('currentGroup', 1);
-
-                // Перезагружаем все данные
-                await this.loadGroups();
-                await this.refreshAllData();
-            } else {
-                const result = await response.json();
-                throw new Error(result.detail || 'Ошибка удаления группы');
-            }
-        } catch (error) {
-            this.showError('Ошибка удаления группы: ' + error.message);
-        } finally {
-            this.hideLoading();
-        }
+    if (this.currentGroupId === 1) {
+        this.showError('Нельзя удалить основную группу');
+        return;
     }
+
+    const groupName = this.getCurrentGroupName();
+    if (!confirm(`ВНИМАНИЕ! Удалить группу "${groupName}" и ВСЕ её данные (предметы, расписание, сохраненные расписания)?`)) return;
+
+    this.showLoading();
+
+    try {
+        console.log(`🗑️ Удаление группы ${this.currentGroupId}: "${groupName}"`);
+
+        const response = await fetch(`/api/groups/${this.currentGroupId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            this.showSuccess(`Группа "${groupName}" удалена`);
+
+            // Переключаемся на основную группу
+            this.currentGroupId = 1;
+            localStorage.setItem('currentGroup', 1);
+
+            // ПЕРЕЗАГРУЖАЕМ ВСЕ ДАННЫЕ
+            await this.loadGroups(); // ОБЯЗАТЕЛЬНО сначала группы
+            await this.refreshAllData(); // Потом все остальное
+
+            // Убедимся, что группа удалилась из списка
+            console.log(`✅ Переключено на группу 1, обновляем интерфейс`);
+
+        } else {
+            const result = await response.json();
+            throw new Error(result.detail || result.error || 'Ошибка удаления группы');
+        }
+    } catch (error) {
+        console.error('❌ Ошибка удаления группы:', error);
+        this.showError('Ошибка удаления группы: ' + error.message);
+    } finally {
+        this.hideLoading();
+    }
+}
 
     // ========== ПРЕПОДАВАТЕЛИ (ГЛОБАЛЬНЫЕ) ==========
     async loadTeachers() {
@@ -469,49 +493,93 @@ class ScheduleApp {
     // ========== ПРЕДМЕТЫ (ЛОКАЛЬНЫЕ ДЛЯ ГРУППЫ) ==========
     async loadSubjects() {
         try {
+            console.log(`📚 Загрузка предметов для группы ${this.currentGroupId}`);
+
             const response = await fetch(`/api/subjects?group_id=${this.currentGroupId}`);
-            if (response.ok) {
-                this.subjects = await response.json();
-                this.renderSubjectsList();
-            } else {
-                throw new Error('Failed to load subjects');
+
+            console.log(`📥 Ответ сервера: ${response.status} ${response.statusText}`);
+
+            // ПРОМЕЖУТОЧНАЯ ОТЛАДКА
+            const responseClone = response.clone(); // Клонируем ответ
+            const text = await responseClone.text();
+            console.log(`📥 Сырой ответ (первые 500 символов): ${text.substring(0, 500)}`);
+
+            if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
+                console.error('❌ Сервер вернул HTML вместо JSON!');
+                throw new Error('Сервер вернул HTML страницу');
             }
+
+            // Пробуем парсить
+            this.subjects = JSON.parse(text);
+            console.log(`✅ Загружено предметов: ${this.subjects.length}`);
+            console.log('📊 Пример предмета:', this.subjects[0]);
+
+            this.renderSubjectsList();
+
         } catch (error) {
-            console.error('Error loading subjects:', error);
+            console.error('❌ Ошибка загрузки предметов:', error);
             this.showError('Ошибка загрузки предметов: ' + error.message);
+            this.subjects = [];
+            this.renderSubjectsList();
         }
     }
 
     renderSubjectsList() {
         const container = document.getElementById('subjectsList');
+
         if (!this.subjects || this.subjects.length === 0) {
             container.innerHTML = '<div class="empty-state">Нет добавленных предметов</div>';
             return;
         }
 
+        console.log(`📊 Рендеринг ${this.subjects.length} предметов`);
+
         container.innerHTML = this.subjects.map(subject => {
-            const consumedHours = subject.total_hours - subject.remaining_hours;
-            const progressPercent = subject.total_hours > 0 ? (consumedHours / subject.total_hours) * 100 : 0;
+            // Проверяем что все поля существуют
+            const subjectName = subject.subject_name || 'Без названия';
+            const teacherName = subject.teacher || 'Без преподавателя';
+            const totalHours = subject.total_hours || 0;
+            const remainingHours = subject.remaining_hours || 0;
+            const consumedHours = totalHours - remainingHours;
+            const progressPercent = totalHours > 0 ? (consumedHours / totalHours) * 100 : 0;
+
+            const remainingPairs = subject.remaining_pairs || 0;
+            const minPerWeek = subject.min_per_week || 0;
+            const maxPerWeek = subject.max_per_week || 20;
+            const maxPerDay = subject.max_per_day || 2;
+            const priority = subject.priority || 0;
+
+            // Отображаем квоты
+            let quotaInfo = '';
+            if (minPerWeek > 0) {
+                quotaInfo = `📅 ${minPerWeek}-${maxPerWeek} пар/нед`;
+            } else if (maxPerWeek < 20) {
+                quotaInfo = `📅 до ${maxPerWeek} пар/нед`;
+            } else {
+                quotaInfo = `📅 без ограничений`;
+            }
 
             return `
                 <div class="subject-item" data-id="${subject.id}">
                     <div class="subject-info">
-                        <strong>${subject.subject_name}</strong>
-                        <div class="teacher-name">${subject.teacher}</div>
+                        <strong>${subjectName}</strong>
+                        <div class="teacher-name">${teacherName}</div>
                         <div class="hours-info">
                             <div class="hours-progress">
-                                ${consumedHours} / ${subject.total_hours} часов
+                                ${consumedHours} / ${totalHours} часов
                             </div>
                             <div class="progress-bar">
                                 <div class="progress-fill" style="width: ${progressPercent}%"></div>
                             </div>
                             <div class="pairs-info">
-                                ${subject.remaining_pairs} пар осталось
+                                ${remainingPairs} пар осталось • 
+                                ${quotaInfo} • 
+                                ${maxPerDay} пар/день
                             </div>
                         </div>
                     </div>
                     <div class="subject-actions">
-                        <div class="priority-badge">Приоритет: ${subject.priority}</div>
+                        <div class="priority-badge">Приоритет: ${priority}</div>
                         <button class="btn-danger btn-small" onclick="app.deleteSubject(${subject.id})">
                             <i class="fas fa-times"></i>
                         </button>
@@ -530,12 +598,34 @@ class ScheduleApp {
             subject_name: formData.get('subject_name'),
             hours: parseInt(formData.get('hours')),
             priority: parseInt(formData.get('priority')) || 0,
-            max_per_day: parseInt(formData.get('max_per_day')) || 2
+            max_per_day: parseInt(formData.get('max_per_day')) || 2,
+            min_per_week: parseInt(formData.get('min_per_week')) || 0,
+            max_per_week: parseInt(formData.get('max_per_week')) || 20
         };
 
         // Валидация
         if (!data.teacher || !data.subject_name || !data.hours) {
             this.showError('Заполните все обязательные поля');
+            return;
+        }
+
+        if (data.hours < 2 || data.hours % 2 !== 0) {
+            this.showError('Часы должны быть положительным числом, кратным 2');
+            return;
+        }
+
+        if (data.min_per_week > data.max_per_week) {
+            this.showError('Минимум не может быть больше максимума');
+            return;
+        }
+
+        if (data.max_per_day > 4) {
+            this.showError('Максимум пар в день не может быть больше 4');
+            return;
+        }
+
+        if (data.max_per_week > 20) {
+            this.showError('Максимум пар в неделю не может быть больше 20');
             return;
         }
 
@@ -560,8 +650,10 @@ class ScheduleApp {
             } else {
                 if (response.status === 409) {
                     this.showError('Предмет с таким названием уже существует у этого преподавателя в этой группе');
+                } else if (response.status === 400) {
+                    this.showError(result.error || 'Ошибка добавления предмета');
                 } else {
-                    throw new Error(result.detail || result.error || 'Ошибка добавления предмета');
+                    throw new Error(result.detail || 'Ошибка добавления предмета');
                 }
             }
         } catch (error) {
@@ -610,80 +702,247 @@ class ScheduleApp {
     }
 
     renderSchedule() {
-        const scheduleGrid = document.getElementById('scheduleGrid');
-        const weekDays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
-        const timeSlots = [
-            { start: '9:00', end: '10:30' },
-            { start: '10:40', end: '12:10' },
-            { start: '12:40', end: '14:10' },
-            { start: '14:20', end: '15:50' }
-        ];
+    const scheduleGrid = document.getElementById('scheduleGrid');
+    const weekDays = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+    const timeSlots = [
+        { start: '9:00', end: '10:30' },
+        { start: '10:40', end: '12:10' },
+        { start: '12:40', end: '14:10' },
+        { start: '14:20', end: '15:50' }
+    ];
 
-        let html = '';
+    let html = '';
 
-        // Header row - ТОЛЬКО полные названия дней
-        html += '<div class="schedule-header"></div>';
-        weekDays.forEach((day, index) => {
-            const isWeekend = index >= 5;
-            html += `<div class="schedule-header ${isWeekend ? 'weekend' : ''}">${day}</div>`;
-        });
+    // Header row - ТОЛЬКО полные названия дней
+    html += '<div class="schedule-header"></div>';
+    weekDays.forEach((day, index) => {
+        const isWeekend = index >= 5;
+        html += `<div class="schedule-header ${isWeekend ? 'weekend' : ''}">${day}</div>`;
+    });
 
-        // Time slots and lessons
-        timeSlots.forEach((slot, slotIndex) => {
-            html += `<div class="time-slot">${slot.start}<br>${slot.end}<div class="time-slot-number">${slotIndex + 1}</div></div>`;
+    // Time slots and lessons
+    timeSlots.forEach((slot, slotIndex) => {
+        html += `<div class="time-slot">${slot.start}<br>${slot.end}<div class="time-slot-number">${slotIndex + 1}</div></div>`;
 
-            for (let day = 0; day < 7; day++) {
-                const lesson = this.lessons.find(l => l.day === day && l.time_slot === slotIndex);
-                const isWeekend = day >= 5;
+        for (let day = 0; day < 7; day++) {
+            const lesson = this.lessons.find(l => l.day === day && l.time_slot === slotIndex);
+            const isWeekend = day >= 5;
 
-                html += `<div class="schedule-cell ${isWeekend ? 'weekend' : ''}" data-day="${day}" data-slot="${slotIndex}">`;
+            html += `<div class="schedule-cell ${isWeekend ? 'weekend' : ''}" data-day="${day}" data-slot="${slotIndex}">`;
 
-                if (lesson) {
-                    html += `
-                        <div class="lesson-card">
-                            <div class="lesson-content">
-                                <strong>${lesson.subject_name}</strong>
-                                <div class="lesson-teacher">${lesson.teacher}</div>
-                            </div>
+            if (lesson) {
+                html += `
+                    <div class="lesson-card">
+                        <div class="lesson-content">
+                            <strong>${lesson.subject_name}</strong>
+                            <div class="lesson-teacher">${lesson.teacher}</div>
                         </div>
-                    `;
-                } else {
-                    html += `<div class="empty-slot"><i class="fas fa-plus"></i><span>Свободно</span></div>`;
-                }
+                    </div>
+                `;
+            } else {
+                html += `<div class="empty-slot"><i class="fas fa-plus"></i><span>Свободно</span></div>`;
+            }
 
-                html += '</div>';
+            html += '</div>';
+        }
+    });
+
+    scheduleGrid.innerHTML = html;
+
+    // ВАЖНО: Добавляем обработчик ПКМ на ВСЕ ячейки (и занятые, и свободные)
+    scheduleGrid.querySelectorAll('.schedule-cell').forEach(cell => {
+        cell.addEventListener('contextmenu', (e) => {
+            e.preventDefault(); // Отменяем стандартное меню
+
+            const day = parseInt(cell.dataset.day);
+            const timeSlot = parseInt(cell.dataset.slot);
+            const hasLesson = cell.querySelector('.lesson-card');
+
+            console.log(`🖱️ ПКМ на ячейке: день=${day}, слот=${timeSlot}, есть урок=${hasLesson ? 'да' : 'нет'}`);
+
+            if (hasLesson) {
+                // ЗАНЯТАЯ ячейка - удаление/замена
+                this.currentLesson = { day, timeSlot };
+                this.currentSlot = { day, timeSlot };
+                this.showOccupiedContextMenu(e, cell);
+            } else {
+                // СВОБОДНАЯ ячейка - добавление
+                this.currentLesson = null;
+                this.currentSlot = { day, timeSlot };
+                this.showEmptyContextMenu(e, cell);
             }
         });
 
-        scheduleGrid.innerHTML = html;
-
-        // Add click handlers for lessons
-        scheduleGrid.querySelectorAll('.schedule-cell').forEach(cell => {
-            cell.addEventListener('click', (e) => {
-                if (e.target.closest('.lesson-card')) {
-                    this.handleLessonClick(cell);
-                }
-            });
+        // Левая кнопка мыши - для совместимости
+        cell.addEventListener('click', (e) => {
+            if (e.target.closest('.lesson-card')) {
+                console.log('Левая кнопка на занятой ячейке');
+                // Можно добавить что-то если нужно
+            }
         });
+    });
+}
+
+showEmptyContextMenu(e, cell) {
+    const contextMenu = document.getElementById('contextMenu');
+
+    contextMenu.innerHTML = `
+        <div class="context-item" data-action="add_lesson">
+            <i class="fas fa-plus"></i> Добавить пару
+        </div>
+    `;
+
+    contextMenu.style.display = 'block';
+    contextMenu.style.left = e.pageX + 'px';
+    contextMenu.style.top = e.pageY + 'px';
+
+    // Обработчики для свободной ячейки
+    contextMenu.querySelectorAll('.context-item').forEach(item => {
+        item.onclick = () => {
+            const action = item.dataset.action;
+            this.handleEmptyContextAction(action);
+            this.hideContextMenu();
+        };
+    });
+}
+
+
+handleOccupiedContextAction(action) {
+    switch (action) {
+        case 'delete':
+            this.deleteLesson();
+            break;
+        case 'replace':
+            this.showReplaceModal();
+            break;
     }
+}
+
+// ========== ОБРАБОТЧИКИ ДЕЙСТВИЙ ДЛЯ СВОБОДНЫХ ЯЧЕЕК ==========
+
+handleEmptyContextAction(action) {
+    switch (action) {
+        case 'add_lesson':
+            this.showAddLessonModal();
+            break;
+    }
+}
+
+// ========== НОВЫЕ ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ==========
+async checkTeacherAvailability() {
+    if (!this.currentLesson) return;
+
+    // Получаем информацию о текущем уроке
+    const lesson = this.lessons.find(l =>
+        l.day === this.currentLesson.day &&
+        l.time_slot === this.currentLesson.timeSlot
+    );
+
+    if (!lesson) {
+        this.showError('Не удалось найти информацию об уроке');
+        return;
+    }
+
+    this.showLoading();
+
+    try {
+        const response = await fetch(`/api/manual/check-availability?teacher=${encodeURIComponent(lesson.teacher)}&day=${this.currentLesson.day}&time_slot=${this.currentLesson.timeSlot}&group_id=${this.currentGroupId}`);
+
+        if (response.ok) {
+            const result = await response.json();
+            if (result.available) {
+                this.showSuccess(`Преподаватель ${lesson.teacher} доступен в это время`);
+            } else {
+                this.showError(`Преподаватель ${lesson.teacher} НЕ доступен: ${result.message}`);
+            }
+        } else {
+            const errorText = await response.text();
+            throw new Error(errorText);
+        }
+    } catch (error) {
+        this.showError('Ошибка проверки: ' + error.message);
+    } finally {
+        this.hideLoading();
+    }
+}
+
+async checkSlotAvailability() {
+    if (!this.currentSlot) return;
+
+    this.showLoading();
+
+    try {
+        const response = await fetch(`/api/lessons/check-slot?day=${this.currentSlot.day}&time_slot=${this.currentSlot.timeSlot}&group_id=${this.currentGroupId}`);
+
+        if (response.ok) {
+            const result = await response.json();
+            if (result.available) {
+                this.showSuccess(`Слот свободен. Можно добавить пару.`);
+            } else {
+                this.showError(`Слот занят в текущей группе.`);
+            }
+        } else {
+            const errorText = await response.text();
+            throw new Error(errorText);
+        }
+    } catch (error) {
+        this.showError('Ошибка проверки: ' + error.message);
+    } finally {
+        this.hideLoading();
+    }
+}
+
+showOccupiedContextMenu(e, cell) {
+    const contextMenu = document.getElementById('contextMenu');
+
+    contextMenu.innerHTML = `
+        <div class="context-item" data-action="delete">
+            <i class="fas fa-trash"></i> Удалить пару
+        </div>
+        <div class="context-item" data-action="replace">
+            <i class="fas fa-exchange-alt"></i> Заменить предмет
+        </div>
+    `;
+
+    contextMenu.style.display = 'block';
+    contextMenu.style.left = e.pageX + 'px';
+    contextMenu.style.top = e.pageY + 'px';
+
+    // Обработчики для занятой ячейки
+    contextMenu.querySelectorAll('.context-item').forEach(item => {
+        item.onclick = () => {
+            const action = item.dataset.action;
+            this.handleOccupiedContextAction(action);
+            this.hideContextMenu();
+        };
+    });
+}
 
     async generateSchedule() {
         this.showLoading();
 
         try {
+            console.log(`⚡ Генерация расписания для группы ${this.currentGroupId}`);
+
             const response = await fetch(`/api/schedule/generate?group_id=${this.currentGroupId}`, {
                 method: 'POST'
             });
 
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+
             const result = await response.json();
 
-            if (response.ok) {
+            if (result.success) {
                 this.showSuccess(`Сгенерировано ${result.lessons.length} пар для группы ${this.getCurrentGroupName()}`);
                 await this.refreshAllData();
             } else {
                 throw new Error(result.detail || 'Ошибка генерации');
             }
         } catch (error) {
+            console.error('❌ Ошибка генерации:', error);
             this.showError('Ошибка генерации: ' + error.message);
         } finally {
             this.hideLoading();
@@ -977,23 +1236,22 @@ class ScheduleApp {
 
     // ========== СТАТИСТИКА ==========
     async updateStatistics() {
-    try {
-        const response = await fetch(`/api/statistics?group_id=${this.currentGroupId}`);
-        if (response.ok) {
-            const stats = await response.json();
+        try {
+            const response = await fetch(`/api/statistics?group_id=${this.currentGroupId}`);
+            if (response.ok) {
+                const stats = await response.json();
 
-            // Обновляем все параметры
-            document.getElementById('statSubjects').textContent = stats.total_subjects;
-            document.getElementById('statTotalHours').textContent = stats.total_hours;
-            document.getElementById('statRemainingHours').textContent = stats.remaining_hours;
+                // Обновляем все параметры
+                document.getElementById('statSubjects').textContent = stats.total_subjects;
+                document.getElementById('statTotalHours').textContent = stats.total_hours;
+                document.getElementById('statRemainingHours').textContent = stats.remaining_hours;
 
-            console.log(`📊 Статистика обновлена для группы ${this.currentGroupId}:`, stats);
+                console.log(`📊 Статистика обновлена для группы ${this.currentGroupId}:`, stats);
+            }
+        } catch (error) {
+            console.error('Error loading statistics:', error);
         }
-    } catch (error) {
-        console.error('Error loading statistics:', error);
     }
-}
-
 
     // ========== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ==========
     async refreshAllData() {
@@ -1012,31 +1270,31 @@ class ScheduleApp {
     }
 
     async fixHoursCalculation() {
-    if (!confirm('Пересчитать и исправить все часы для текущей группы?')) return;
+        if (!confirm('Пересчитать и исправить все часы для текущей группы?')) return;
 
-    this.showLoading();
+        this.showLoading();
 
-    try {
-        const response = await fetch(`/api/statistics/fix-hours?group_id=${this.currentGroupId}`, {
-            method: 'POST'
-        });
+        try {
+            const response = await fetch(`/api/statistics/fix-hours?group_id=${this.currentGroupId}`, {
+                method: 'POST'
+            });
 
-        if (response.ok) {
-            const result = await response.json();
-            this.showSuccess(result.message);
+            if (response.ok) {
+                const result = await response.json();
+                this.showSuccess(result.message);
 
-            // Перезагружаем все данные
-            await this.refreshAllData();
-        } else {
-            const result = await response.json();
-            throw new Error(result.detail || 'Ошибка исправления часов');
+                // Перезагружаем все данные
+                await this.refreshAllData();
+            } else {
+                const result = await response.json();
+                throw new Error(result.detail || 'Ошибка исправления часов');
+            }
+        } catch (error) {
+            this.showError('Ошибка исправления часов: ' + error.message);
+        } finally {
+            this.hideLoading();
         }
-    } catch (error) {
-        this.showError('Ошибка исправления часов: ' + error.message);
-    } finally {
-        this.hideLoading();
     }
-}
 
     async clearAllData() {
         if (!confirm('ВНИМАНИЕ! Это действие удалит все данные текущей группы. Продолжить?')) return;
@@ -1114,169 +1372,367 @@ class ScheduleApp {
 
     // ========== CONTEXT MENU ==========
     handleLessonClick(cell) {
-        console.log('Lesson clicked:', cell.dataset.day, cell.dataset.slot);
+    // Это уже есть, оставляем как есть
+    console.log('Lesson clicked:', cell.dataset.day, cell.dataset.slot);
+}
+
+showContextMenu(e) {
+    const contextMenu = document.getElementById('contextMenu');
+    const cell = e.target.closest('.schedule-cell');
+    const hasLesson = cell.querySelector('.lesson-card');
+
+    const day = parseInt(cell.dataset.day);
+    const timeSlot = parseInt(cell.dataset.slot);
+
+    // Сохраняем информацию о текущей ячейке
+    this.currentSlot = { day, timeSlot };
+
+    if (hasLesson) {
+        // Если есть урок - режим удаления/замены
+        this.currentLesson = { day, timeSlot };
+        contextMenu.innerHTML = `
+            <div class="context-item" data-action="delete">
+                <i class="fas fa-trash"></i> Удалить пару
+            </div>
+            <div class="context-item" data-action="replace">
+                <i class="fas fa-exchange-alt"></i> Заменить предмет
+            </div>
+        `;
+    } else {
+        // Если пустая ячейка - режим добавления
+        this.currentLesson = null; // Нет урока для удаления
+        contextMenu.innerHTML = `
+            <div class="context-item" data-action="add_lesson">
+                <i class="fas fa-plus"></i> Добавить пару
+            </div>
+        `;
     }
 
-    showContextMenu(e) {
-        const contextMenu = document.getElementById('contextMenu');
-        const cell = e.target.closest('.schedule-cell');
+    contextMenu.style.display = 'block';
+    contextMenu.style.left = e.pageX + 'px';
+    contextMenu.style.top = e.pageY + 'px';
 
-        this.currentLesson = {
-            day: parseInt(cell.dataset.day),
-            time_slot: parseInt(cell.dataset.slot)
+    // Обработчики действий
+    contextMenu.querySelectorAll('.context-item').forEach(item => {
+        item.onclick = () => {
+            const action = item.dataset.action;
+            this.handleContextAction(action);
         };
+    });
+}
+
+handleContextAction(action) {
+    switch (action) {
+        case 'delete':
+            this.deleteLesson();
+            break;
+        case 'replace':
+            this.showReplaceModal();
+            break;
+        case 'add_lesson':
+            this.showAddLessonModal();
+            break;
+    }
+    this.hideContextMenu();
+}
+
+    showEmptyCellContextMenu(e, cell) {
+        const contextMenu = document.getElementById('contextMenu');
+        const day = parseInt(cell.dataset.day);
+        const timeSlot = parseInt(cell.dataset.slot);
+
+        this.currentSlot = { day, timeSlot };
+        this.currentLesson = null;  // Сбрасываем currentLesson для пустой ячейки
+
+        // Меню для свободной ячейки
+        contextMenu.innerHTML = `
+            <div class="context-item" data-action="add_lesson">
+                <i class="fas fa-plus"></i> Добавить пару
+            </div>
+        `;
 
         contextMenu.style.display = 'block';
         contextMenu.style.left = e.pageX + 'px';
         contextMenu.style.top = e.pageY + 'px';
 
-        // Context menu actions
-        contextMenu.querySelectorAll('.context-item').forEach(item => {
-            item.onclick = () => {
-                const action = item.dataset.action;
-                this.handleContextAction(action);
-            };
-        });
+        // Обработчик для свободной ячейки
+        contextMenu.querySelector('.context-item').onclick = () => {
+            this.showAddLessonModal(true);  // true = режим добавления в пустую ячейку
+            this.hideContextMenu();
+        };
     }
 
-    hideContextMenu() {
-        document.getElementById('contextMenu').style.display = 'none';
-    }
+   hideContextMenu() {
+    document.getElementById('contextMenu').style.display = 'none';
+}
 
-    handleContextAction(action) {
-        switch (action) {
-            case 'delete':
-                this.deleteLesson();
-                break;
-            case 'replace':
-                this.showReplaceModal();
-                break;
-        }
-        this.hideContextMenu();
-    }
+    showAddLessonModal() {
+    const modal = document.getElementById('replaceModal');
+    const modalTitle = modal.querySelector('h3');
+    const confirmBtn = document.getElementById('confirmReplace');
+    const cancelBtn = document.getElementById('cancelReplace');
 
+    // Настраиваем модалку для добавления
+    modalTitle.textContent = 'Добавить пару';
+    confirmBtn.textContent = 'Добавить';
+
+    // Устанавливаем день и время
+    document.getElementById('replaceDay').value = this.currentSlot.day;
+    document.getElementById('replaceTimeSlot').value = this.currentSlot.timeSlot;
+
+    // Заполняем список предметов
+    this.populateSubjectSelect();
+
+    // Очищаем предыдущие обработчики
+    confirmBtn.onclick = null;
+    cancelBtn.onclick = null;
+
+    // Новые обработчики
+    confirmBtn.onclick = async () => {
+        await this.addLessonToEmptySlot();
+    };
+
+    cancelBtn.onclick = () => {
+        modal.style.display = 'none';
+    };
+
+    modal.style.display = 'block';
+}
+
+    // 1. Обновленный метод deleteLesson
     async deleteLesson() {
-        if (!this.currentLesson) return;
-
-        if (!confirm('Удалить эту пару?')) return;
-
-        try {
-            const response = await fetch(`/api/lessons?day=${this.currentLesson.day}&time_slot=${this.currentLesson.time_slot}&group_id=${this.currentGroupId}`, {
-                method: 'DELETE'
-            });
-
-            if (response.ok) {
-                this.showSuccess('Пара удалена');
-                await this.loadLessons();
-                await this.updateStatistics();
-            } else {
-                throw new Error(await response.text());
-            }
-        } catch (error) {
-            this.showError('Ошибка удаления: ' + error.message);
-        }
+    if (!this.currentLesson) {
+        this.showError('Не выбрана пара для удаления');
+        return;
     }
 
-    showReplaceModal() {
-        const modal = document.getElementById('replaceModal');
-        document.getElementById('replaceDay').value = this.currentLesson.day;
-        document.getElementById('replaceTimeSlot').value = this.currentLesson.time_slot;
+    if (!confirm('Удалить эту пару?')) return;
 
-        // Заполняем выпадающий список предметами текущей группы
-        this.populateSubjectSelect();
+    this.showLoading();
 
-        modal.style.display = 'block';
-    }
+    try {
+        const response = await fetch(`/api/lessons?day=${this.currentLesson.day}&time_slot=${this.currentLesson.timeSlot}&group_id=${this.currentGroupId}`, {
+            method: 'DELETE'
+        });
 
-    updateSelectedSubjectInfo(select) {
-        const infoDiv = document.getElementById('selectedSubjectInfo');
-        const selectedOption = select.options[select.selectedIndex];
+        if (response.ok) {
+            const result = await response.json();
+            this.showSuccess(result.message || 'Пара удалена');
 
-        if (selectedOption.value) {
-            document.getElementById('infoTeacher').textContent = selectedOption.dataset.teacher;
-            document.getElementById('infoHours').textContent = selectedOption.dataset.totalHours;
-            document.getElementById('infoRemainingPairs').textContent = selectedOption.dataset.remainingPairs;
-            infoDiv.style.display = 'block';
+            // Очищаем текущий урок
+            this.currentLesson = null;
+
+            // Обновляем данные
+            await this.refreshAllData();
         } else {
-            infoDiv.style.display = 'none';
+            const errorText = await response.text();
+            throw new Error(errorText || 'Ошибка удаления');
         }
+    } catch (error) {
+        console.error('❌ Ошибка удаления:', error);
+        this.showError('Ошибка удаления: ' + error.message);
+    } finally {
+        this.hideLoading();
     }
+}
+
+showReplaceModal() {
+    const modal = document.getElementById('replaceModal');
+    const modalTitle = modal.querySelector('h3');
+    const confirmBtn = document.getElementById('confirmReplace');
+    const cancelBtn = document.getElementById('cancelReplace');
+
+    // Настраиваем модалку для замены
+    modalTitle.textContent = 'Заменить пару';
+    confirmBtn.textContent = 'Заменить';
+
+    // Устанавливаем день и время
+    document.getElementById('replaceDay').value = this.currentLesson.day;
+    document.getElementById('replaceTimeSlot').value = this.currentLesson.timeSlot;
+
+    // Заполняем список предметов
+    this.populateSubjectSelect();
+
+    // Очищаем предыдущие обработчики
+    confirmBtn.onclick = null;
+    cancelBtn.onclick = null;
+
+    // Новые обработчики
+    confirmBtn.onclick = async () => {
+        await this.replaceLesson();
+    };
+
+    cancelBtn.onclick = () => {
+        modal.style.display = 'none';
+    };
+
+    modal.style.display = 'block';
+}
+
+    // 2. Обновленный метод replaceLesson
+    async replaceLesson() {
+    const subjectSelect = document.getElementById('replaceSubjectSelect');
+    const subjectId = subjectSelect.value;
+
+    if (!subjectId) {
+        this.showError('Выберите предмет для замены');
+        return;
+    }
+
+    // Находим выбранный предмет
+    const selectedSubject = this.subjects.find(s => s.id == subjectId);
+    if (!selectedSubject) {
+        this.showError('Выбранный предмет не найден');
+        return;
+    }
+
+    const data = {
+        day: parseInt(document.getElementById('replaceDay').value),
+        time_slot: parseInt(document.getElementById('replaceTimeSlot').value),
+        new_teacher: selectedSubject.teacher,
+        new_subject_name: selectedSubject.subject_name
+    };
+
+    console.log('📤 Данные для замены:', data);
+
+    this.showLoading();
+
+    try {
+        const response = await fetch(`/api/manual/lessons?group_id=${this.currentGroupId}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
+
+        console.log('📥 Ответ сервера:', response.status, response.statusText);
+
+        if (response.ok) {
+            const result = await response.json();
+            this.showSuccess(result.message || 'Пара успешно заменена');
+
+            // Закрываем модалку
+            document.getElementById('replaceModal').style.display = 'none';
+            subjectSelect.innerHTML = '<option value="">Выберите предмет из списка</option>';
+            document.getElementById('selectedSubjectInfo').style.display = 'none';
+
+            // Обновляем данные
+            await this.refreshAllData();
+        } else {
+            const result = await response.json();
+            console.error('❌ Ошибка от сервера:', result);
+            throw new Error(result.detail || result.message || `Ошибка ${response.status}`);
+        }
+    } catch (error) {
+        console.error('❌ Ошибка замены:', error);
+        this.showError('Ошибка замены: ' + error.message);
+    } finally {
+        this.hideLoading();
+    }
+}
+
+    // 3. Новый метод для добавления пары в пустую ячейку
+    async addLessonToEmptySlot() {
+    const form = document.getElementById('replaceForm');
+    const subjectId = document.getElementById('replaceSubjectSelect').value;
+
+    if (!subjectId) {
+        this.showError('Выберите предмет для добавления');
+        return;
+    }
+
+    // Находим выбранный предмет
+    const selectedSubject = this.subjects.find(s => s.id == subjectId);
+    if (!selectedSubject) {
+        this.showError('Выбранный предмет не найден');
+        return;
+    }
+
+    const data = {
+        day: parseInt(document.getElementById('replaceDay').value),
+        time_slot: parseInt(document.getElementById('replaceTimeSlot').value),
+        teacher: selectedSubject.teacher,
+        subject_name: selectedSubject.subject_name
+    };
+
+    this.showLoading();
+
+    try {
+        console.log('📤 Добавление пары:', data);
+
+        const response = await fetch(`/api/manual/lessons?group_id=${this.currentGroupId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            this.showSuccess(result.message || 'Пара добавлена');
+
+            // Закрываем модалку
+            document.getElementById('replaceModal').style.display = 'none';
+            form.reset();
+            document.getElementById('selectedSubjectInfo').style.display = 'none';
+
+            // Обновляем данные
+            await this.refreshAllData();
+        } else {
+            const result = await response.json();
+            throw new Error(result.detail || result.message || 'Ошибка добавления');
+        }
+    } catch (error) {
+        console.error('❌ Ошибка добавления:', error);
+        this.showError('Ошибка добавления: ' + error.message);
+    } finally {
+        this.hideLoading();
+    }
+}
 
     populateSubjectSelect() {
-        const select = document.getElementById('replaceSubjectSelect');
-        select.innerHTML = '<option value="">Выберите предмет из списка</option>';
+    const select = document.getElementById('replaceSubjectSelect');
+    select.innerHTML = '<option value="">Выберите предмет из списка</option>';
 
-        this.subjects.forEach(subject => {
-            if (subject.remaining_pairs > 0) {
-                const option = document.createElement('option');
-                option.value = subject.id;
-                option.textContent = `${subject.teacher} - ${subject.subject_name} (${subject.remaining_pairs} пар осталось)`;
-                option.dataset.teacher = subject.teacher;
-                option.dataset.subjectName = subject.subject_name;
-                option.dataset.remainingPairs = subject.remaining_pairs;
-                option.dataset.totalHours = subject.total_hours;
-                select.appendChild(option);
-            }
-        });
-
-        // Добавляем обработчик изменения выбора
-        select.addEventListener('change', (e) => {
-            this.updateSelectedSubjectInfo(e.target);
-        });
+    if (!this.subjects || this.subjects.length === 0) {
+        console.warn('⚠️ Нет предметов для выбора');
+        return;
     }
 
-    async replaceLesson() {
-        const form = document.getElementById('replaceForm');
-        const subjectId = form.subject_id.value;
-
-        if (!subjectId) {
-            this.showError('Выберите предмет для замены');
-            return;
+    this.subjects.forEach(subject => {
+        if (subject.remaining_pairs > 0) {
+            const option = document.createElement('option');
+            option.value = subject.id;
+            option.textContent = `${subject.teacher} - ${subject.subject_name} (${subject.remaining_pairs} пар осталось)`;
+            option.dataset.teacher = subject.teacher;
+            option.dataset.subjectName = subject.subject_name;
+            option.dataset.remainingPairs = subject.remaining_pairs;
+            option.dataset.totalHours = subject.total_hours;
+            select.appendChild(option);
         }
+    });
 
-        // Находим выбранный предмет
-        const selectedSubject = this.subjects.find(s => s.id == subjectId);
-        if (!selectedSubject) {
-            this.showError('Выбранный предмет не найден');
-            return;
-        }
+    // Добавляем обработчик изменения выбора
+    select.addEventListener('change', (e) => {
+        this.updateSelectedSubjectInfo(e.target);
+    });
+}
 
-        const data = {
-            day: parseInt(form.day.value),
-            time_slot: parseInt(form.time_slot.value),
-            new_teacher: selectedSubject.teacher,
-            new_subject_name: selectedSubject.subject_name
-        };
+updateSelectedSubjectInfo(select) {
+    const infoDiv = document.getElementById('selectedSubjectInfo');
+    const selectedOption = select.options[select.selectedIndex];
 
-        this.showLoading();
-
-        try {
-            const response = await fetch(`/api/lessons?group_id=${this.currentGroupId}`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data)
-            });
-
-            if (response.ok) {
-                this.showSuccess('Пара заменена');
-                document.getElementById('replaceModal').style.display = 'none';
-                form.reset();
-                document.getElementById('selectedSubjectInfo').style.display = 'none';
-
-                // Обновляем данные
-                await this.refreshAllData();
-            } else {
-                const result = await response.json();
-                throw new Error(result.detail || 'Ошибка замены пары');
-            }
-        } catch (error) {
-            this.showError('Ошибка замены: ' + error.message);
-        } finally {
-            this.hideLoading();
-        }
+    if (selectedOption.value && selectedOption.dataset.teacher) {
+        document.getElementById('infoTeacher').textContent = selectedOption.dataset.teacher;
+        document.getElementById('infoHours').textContent = selectedOption.dataset.totalHours;
+        document.getElementById('infoRemainingPairs').textContent = selectedOption.dataset.remainingPairs;
+        infoDiv.style.display = 'block';
+    } else {
+        infoDiv.style.display = 'none';
     }
+}
 }
 
 // Добавляем CSS анимации для уведомлений

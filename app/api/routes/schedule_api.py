@@ -53,11 +53,18 @@ class SavedScheduleResponse(BaseModel):
     lesson_count: int
 
 
+# app/api/routes/schedule_api.py
+# app/api/routes/schedule_api.py
 @router.post("/api/schedule/generate", response_model=GenerateScheduleResponse)
 async def generate_schedule(group_id: int = Query(1, description="ID группы")):
-    """Сгенерировать новое расписание для группы"""
+    """Сгенерировать расписание с учетом ВСЕХ параметров"""
     try:
-        lessons = await schedule_service.generate_schedule(group_id)  # ПЕРЕДАТЬ group_id
+        from app.services.shedule_generator import schedule_generator
+
+        print(f"⚡ Генерация расписания для группы {group_id}")
+
+        # Генерируем расписание
+        lessons = await schedule_generator.generate_schedule(group_id)
 
         # Конвертируем в словари для JSON
         lessons_data = []
@@ -81,6 +88,8 @@ async def generate_schedule(group_id: int = Query(1, description="ID групп�
 
     except Exception as e:
         print(f"❌ Ошибка генерации расписания: {e}")
+        import traceback
+        print(f"❌ Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=500,
             detail=f"Ошибка генерации расписания: {str(e)}"

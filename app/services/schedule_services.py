@@ -1,94 +1,17 @@
+# app/services/schedule_services.py
 from app.db.database import database
 from app.db.models import Lesson
-from typing import List, Optional
+from typing import List
 from app.services.shedule_generator import schedule_generator
-import json
-
-from app.services.subject_services import subject_service
 
 
 class ScheduleService:
     def __init__(self):
         self.generator = schedule_generator
-        # Добавляем импорт subject_service
-        from app.services.subject_services import subject_service as ss
-        self.subject_service = ss
 
     async def generate_schedule(self, group_id: int = 1) -> List[Lesson]:
-        """Сгенерировать расписание для конкретной группы"""
-        print(f"🔄 Начинаем генерацию расписания для группы {group_id}...")
-
-        # Очищаем старые уроки и восстанавливаем часы
-        await self.clear_schedule_for_group(group_id)
-
-        # Теперь генерируем новое расписание
-        from app.services.shedule_generator import schedule_generator
-        from app.services.subject_services import subject_service
-
-        # Получаем предметы
-        subjects = await subject_service.get_all_subjects(group_id)
-
-        # Получаем фильтры
-        negative_filters = await subject_service.get_negative_filters(group_id)
-
-        # Генерируем
-        lessons = await schedule_generator.generate(subjects, negative_filters, group_id)
-
-        # Сохраняем уроки
-        for lesson in lessons:
-            await database.execute(
-                'INSERT INTO lessons (day, time_slot, teacher, subject_name, editable, group_id) VALUES (?, ?, ?, ?, ?, ?)',
-                (lesson.day, lesson.time_slot, lesson.teacher, lesson.subject_name, int(lesson.editable), group_id)
-            )
-
-        # 🔴 ВАЖНО: Вычитаем часы
-        for lesson in lessons:
-            subject = await database.fetch_one(
-                'SELECT id FROM subjects WHERE teacher = ? AND subject_name = ? AND group_id = ?',
-                (lesson.teacher, lesson.subject_name, group_id)
-            )
-            if subject:
-                await subject_service.update_subject_hours(subject[0], 2)
-
-        return lessons
-
-    async def clear_schedule_for_group(self, group_id: int = 1) -> bool:
-        """Очистить расписание группы и восстановить часы"""
-        try:
-            print(f"🧹 Очистка расписания группы {group_id}")
-
-            # 1. Восстанавливаем часы для всех уроков группы
-            lessons = await database.fetch_all(
-                'SELECT teacher, subject_name FROM lessons WHERE group_id = ?',
-                (group_id,)
-            )
-
-            for lesson in lessons:
-                teacher, subject_name = lesson
-
-                # Находим предмет
-                subject = await database.fetch_one(
-                    'SELECT id FROM subjects WHERE teacher = ? AND subject_name = ? AND group_id = ?',
-                    (teacher, subject_name, group_id)
-                )
-
-                if subject:
-                    subject_id = subject[0]
-                    # Восстанавливаем 2 часа за каждую пару
-                    await self.subject_service.update_subject_hours(subject_id, -2)
-
-            # 2. Удаляем все уроки группы
-            result = await database.execute(
-                'DELETE FROM lessons WHERE group_id = ?',
-                (group_id,)
-            )
-
-            print(f"✅ Удалено уроков: {result.rowcount}")
-            return True
-
-        except Exception as e:
-            print(f"❌ Ошибка очистки расписания группы {group_id}: {e}")
-            return False
+        """Просто используем главный генератор"""
+        return await self.generator.generate_schedule(group_id)
 
     async def get_all_lessons(self, group_id: int = 1) -> List[Lesson]:
         """Получить все уроки группы"""
@@ -109,7 +32,7 @@ class ScheduleService:
         ]
 
     async def remove_lesson(self, day: int, time_slot: int, group_id: int = 1) -> bool:
-        """Удалить урок (возвращаем часы предмету)"""
+        """Удалить урок"""
         try:
             # Получаем удаляемый урок
             lesson = await database.fetch_one(
@@ -122,30 +45,22 @@ class ScheduleService:
 
             teacher, subject_name = lesson
 
-            # НАХОДИМ ID предмета чтобы использовать единый метод
+            # Восстанавливаем часы
             subject = await database.fetch_one(
                 'SELECT id FROM subjects WHERE teacher = ? AND subject_name = ? AND group_id = ?',
                 (teacher, subject_name, group_id)
             )
 
-            if not subject:
-                print(f"⚠️ Предмет не найден для восстановления часов: {teacher} - {subject_name}")
-                # Все равно удаляем урок
-                result = await database.execute(
-                    'DELETE FROM lessons WHERE day = ? AND time_slot = ? AND group_id = ?',
-                    (day, time_slot, group_id)
+            if subject:
+                subject_id = subject[0]
+                # Восстанавливаем 2 часа
+                await database.execute(
+                    '''UPDATE subjects 
+                       SET remaining_hours = remaining_hours + 2,
+                           remaining_pairs = (remaining_hours + 2) / 2
+                       WHERE id = ?''',
+                    (subject_id,)
                 )
-                return result.rowcount > 0
-
-            subject_id = subject[0]
-
-            # 🔴 КРИТИЧЕСКОЕ ИЗМЕНЕНИЕ: используем subject_service для возврата часов
-            # Отрицательное значение = возвращаем 2 часа
-            from app.services.subject_services import subject_service
-            success = await subject_service.update_subject_hours(subject_id, -2)
-
-            if not success:
-                print(f"⚠️ Не удалось восстановить часы для предмета {subject_id}")
 
             # Удаляем урок
             result = await database.execute(
@@ -159,97 +74,96 @@ class ScheduleService:
             print(f"❌ Ошибка удаления урока: {e}")
             return False
 
-    async def update_lesson(self, day: int, time_slot: int, new_teacher: str, new_subject_name: str,
-                            group_id: int = 1) -> bool:
-        """Обновить урок с проверкой конфликтов между группами"""
-        try:
-            from app.services.subject_services import subject_service
-
-            # 1. Проверяем что преподаватель не занят в это время В ДРУГИХ ГРУППАХ
-            conflict = await database.fetch_one(
-                'SELECT id FROM lessons WHERE teacher = ? AND day = ? AND time_slot = ? AND group_id != ?',
-                (new_teacher, day, time_slot, group_id)
-            )
-            if conflict:
-                print(f"🚫 Преподаватель {new_teacher} уже занят в это время в другой группе")
-                return False
-
-            # 2. Проверяем что в текущей группе есть такой предмет
-            new_subject = await database.fetch_one(
-                'SELECT id, remaining_pairs FROM subjects WHERE teacher = ? AND subject_name = ? AND group_id = ?',
-                (new_teacher, new_subject_name, group_id)
-            )
-            if not new_subject:
-                print(f"🚫 Предмет {new_subject_name} у преподавателя {new_teacher} не найден")
-                return False
-
-            if new_subject[1] <= 0:  # remaining_pairs
-                print(f"🚫 У предмета {new_subject_name} больше нет пар для распределения")
-                return False
-
-            new_subject_id = new_subject[0]
-
-            # 3. Получаем старый урок (если есть) для восстановления часов
-            old_lesson = await database.fetch_one(
-                'SELECT teacher, subject_name FROM lessons WHERE day = ? AND time_slot = ? AND group_id = ?',
-                (day, time_slot, group_id)
-            )
-
-            if old_lesson:
-                old_teacher, old_subject_name = old_lesson
-                # Находим ID старого предмета
-                old_subject = await database.fetch_one(
-                    'SELECT id FROM subjects WHERE teacher = ? AND subject_name = ? AND group_id = ?',
-                    (old_teacher, old_subject_name, group_id)
-                )
-                if old_subject:
-                    old_subject_id = old_subject[0]
-                    # 🔴 Восстанавливаем часы старого предмета (возвращаем 2 часа)
-                    await subject_service.update_subject_hours(old_subject_id, -2)
-
-            # 4. Обновляем урок
-            result = await database.execute(
-                'UPDATE lessons SET teacher = ?, subject_name = ? WHERE day = ? AND time_slot = ? AND group_id = ?',
-                (new_teacher, new_subject_name, day, time_slot, group_id)
-            )
-
-            if result.rowcount == 0:
-                # Если обновления не было, создаем новый урок
-                result = await database.execute(
-                    'INSERT INTO lessons (day, time_slot, teacher, subject_name, editable, group_id) VALUES (?, ?, ?, ?, ?, ?)',
-                    (day, time_slot, new_teacher, new_subject_name, 1, group_id)
-                )
-
-            # 5. Уменьшаем часы нового предмета (забираем 2 часа)
-            await subject_service.update_subject_hours(new_subject_id, 2)
-            return True
-
-        except Exception as e:
-            print(f"❌ Ошибка обновления урока: {e}")
-            return False
+    # async def update_lesson(self, day: int, time_slot: int, new_teacher: str, new_subject_name: str,
+    #                         group_id: int = 1) -> bool:
+    #     """Обновить урок"""
+    #     try:
+    #         # Проверяем что преподаватель не занят в других группах
+    #         conflict = await database.fetch_one(
+    #             'SELECT id FROM lessons WHERE teacher = ? AND day = ? AND time_slot = ? AND group_id != ?',
+    #             (new_teacher, day, time_slot, group_id)
+    #         )
+    #         if conflict:
+    #             return False
+    #
+    #         # Проверяем что предмет существует
+    #         new_subject = await database.fetch_one(
+    #             'SELECT id, remaining_pairs FROM subjects WHERE teacher = ? AND subject_name = ? AND group_id = ?',
+    #             (new_teacher, new_subject_name, group_id)
+    #         )
+    #         if not new_subject or new_subject[1] <= 0:
+    #             return False
+    #
+    #         new_subject_id = new_subject[0]
+    #
+    #         # Получаем старый урок
+    #         old_lesson = await database.fetch_one(
+    #             'SELECT teacher, subject_name FROM lessons WHERE day = ? AND time_slot = ? AND group_id = ?',
+    #             (day, time_slot, group_id)
+    #         )
+    #
+    #         if old_lesson:
+    #             old_teacher, old_subject_name = old_lesson
+    #             # Восстанавливаем часы старого предмета
+    #             old_subject = await database.fetch_one(
+    #                 'SELECT id FROM subjects WHERE teacher = ? AND subject_name = ? AND group_id = ?',
+    #                 (old_teacher, old_subject_name, group_id)
+    #             )
+    #             if old_subject:
+    #                 old_subject_id = old_subject[0]
+    #                 await database.execute(
+    #                     '''UPDATE subjects
+    #                        SET remaining_hours = remaining_hours + 2,
+    #                            remaining_pairs = (remaining_hours + 2) / 2
+    #                        WHERE id = ?''',
+    #                     (old_subject_id,)
+    #                 )
+    #
+    #         # Обновляем урок
+    #         result = await database.execute(
+    #             'UPDATE lessons SET teacher = ?, subject_name = ? WHERE day = ? AND time_slot = ? AND group_id = ?',
+    #             (new_teacher, new_subject_name, day, time_slot, group_id)
+    #         )
+    #
+    #         if result.rowcount == 0:
+    #             # Если обновления не было, создаем новый
+    #             result = await database.execute(
+    #                 'INSERT INTO lessons (day, time_slot, teacher, subject_name, editable, group_id) VALUES (?, ?, ?, ?, ?, ?)',
+    #                 (day, time_slot, new_teacher, new_subject_name, 1, group_id)
+    #             )
+    #
+    #         # Вычитаем часы нового предмета
+    #         await database.execute(
+    #             '''UPDATE subjects
+    #                SET remaining_hours = remaining_hours - 2,
+    #                    remaining_pairs = (remaining_hours - 2) / 2
+    #                WHERE id = ?''',
+    #             (new_subject_id,)
+    #         )
+    #         return True
+    #
+    #     except Exception as e:
+    #         print(f"❌ Ошибка обновления урока: {e}")
+    #         return False
 
     async def get_statistics(self, group_id: int = 1):
-        """Получить статистику для группы"""
+        """Получить статистику"""
         try:
-            # Предметы группы
             subjects_count = await database.fetch_one(
                 'SELECT COUNT(*) FROM subjects WHERE group_id = ?',
                 (group_id,)
             )
 
-            # Преподаватели, которые ведут предметы в этой группе (локально)
             teachers_count = await database.fetch_one(
                 'SELECT COUNT(DISTINCT teacher) FROM subjects WHERE group_id = ?',
                 (group_id,)
             )
 
-            # Часы группы
             hours_data = await database.fetch_one(
                 'SELECT SUM(total_hours), SUM(remaining_hours) FROM subjects WHERE group_id = ?',
                 (group_id,)
             )
 
-            # Пары группы
             pairs_data = await database.fetch_one(
                 'SELECT COUNT(*) FROM lessons WHERE group_id = ?',
                 (group_id,)
@@ -260,19 +174,16 @@ class ScheduleService:
             scheduled_pairs = pairs_data[0] or 0
             remaining_pairs = (remaining_hours // 2) if remaining_hours else 0
 
-            print(
-                f"📊 Статистика группы {group_id}: {subjects_count[0] or 0} предметов, {teachers_count[0] or 0} преподавателей, {scheduled_pairs} пар, {remaining_hours}ч осталось")
-
             return {
                 "total_subjects": subjects_count[0] or 0,
-                "total_teachers": teachers_count[0] or 0,  # Локальные преподаватели группы
+                "total_teachers": teachers_count[0] or 0,
                 "total_hours": total_hours,
                 "remaining_hours": remaining_hours,
                 "scheduled_pairs": scheduled_pairs,
                 "remaining_pairs": remaining_pairs
             }
         except Exception as e:
-            print(f"❌ Ошибка получения статистики для группы {group_id}: {e}")
+            print(f"❌ Ошибка получения статистики: {e}")
             return {
                 "total_subjects": 0,
                 "total_teachers": 0,
@@ -281,17 +192,6 @@ class ScheduleService:
                 "scheduled_pairs": 0,
                 "remaining_pairs": 0
             }
-
-    def get_week_days(self):
-        return ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
-
-    def get_time_slots(self):
-        return [
-            {"start": "9:00", "end": "10:30"},
-            {"start": "10:40", "end": "12:10"},
-            {"start": "12:40", "end": "14:10"},
-            {"start": "14:20", "end": "15:50"}
-        ]
 
 
 # Глобальный экземпляр

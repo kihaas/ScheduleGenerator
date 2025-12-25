@@ -21,6 +21,7 @@ class Teacher(TeacherBase):
         from_attributes = True
 
 
+# app/db/models.py
 class SubjectBase(BaseModel):
     teacher: str
     subject_name: str
@@ -37,6 +38,8 @@ class Subject(SubjectBase):
     remaining_pairs: int = 0
     priority: int = 0
     max_per_day: int = 2
+    min_per_week: int = 1
+    max_per_week: int = 20
 
     class Config:
         from_attributes = True

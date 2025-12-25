@@ -109,7 +109,7 @@ class Database:
 
                 # Таблица предметов - С group_id (ЛОКАЛЬНЫЕ ДЛЯ ГРУППЫ)
                 await conn.execute('''
-                    CREATE TABLE subjects (
+                    CREATE TABLE IF NOT EXISTS subjects (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         teacher TEXT NOT NULL,
                         subject_name TEXT NOT NULL,
@@ -120,9 +120,17 @@ class Database:
                         max_per_day INTEGER DEFAULT 2,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         group_id INTEGER DEFAULT 1,
+                        min_per_week INTEGER DEFAULT 1,
+                        max_per_week INTEGER DEFAULT 20,
                         UNIQUE(teacher, subject_name, group_id)
                     )
                 ''')
+
+                try:
+                    await conn.execute('ALTER TABLE subjects ADD COLUMN min_per_week INTEGER DEFAULT 1')
+                    await conn.execute('ALTER TABLE subjects ADD COLUMN max_per_week INTEGER DEFAULT 20')
+                except Exception as e:
+                    print(f"⚠️ Колонки уже существуют или ошибка: {e}")
 
                 # Таблица занятий - С group_id (ЛОКАЛЬНЫЕ ДЛЯ ГРУППЫ)
                 await conn.execute('''

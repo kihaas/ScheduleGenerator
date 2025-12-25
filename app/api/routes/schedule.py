@@ -9,6 +9,18 @@ from app.services.negative_filters_service import negative_filters_service
 
 router = APIRouter(tags=["schedule"])
 
+# app/api/routes/schedule.py
+from fastapi import APIRouter, Request, Form, HTTPException, Query
+from fastapi.responses import RedirectResponse, JSONResponse
+from starlette.responses import JSONResponse
+
+from app.db import database
+from app.services.schedule_services import schedule_service
+from app.services.shedule_generator import schedule_generator
+from app.services.negative_filters_service import negative_filters_service
+
+router = APIRouter(tags=["schedule"])
+
 
 @router.post("/generate-schedule")
 async def generate_schedule_route(request: Request):
@@ -20,32 +32,20 @@ async def generate_schedule_route(request: Request):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+# app/api/routes/schedule.py - УДАЛИТЕ старый метод или замените его:
 @router.post("/generate")
 async def generate_schedule_for_group(group_id: int = Query(1, description="ID группы")):
-    """Сгенерировать расписание для указанной группы"""
+    """Генерация расписания (перенаправление на API)"""
     try:
-        print(f"🔄 Начинаем генерацию расписания для группы {group_id}...")
+        # Просто перенаправляем на API версию
+        from app.services.shedule_generator import schedule_generator
+        lessons = await schedule_generator.generate_schedule(group_id)
 
-        # Получаем предметы для группы
-        subjects = await schedule_generator.get_subjects_for_group(group_id)
-        print(f"📚 Найдено предметов в группе {group_id}: {len(subjects)}")
-
-        # Получаем ГЛОБАЛЬНЫЕ ограничения
-        from app.services.negative_filters_service import negative_filters_service
-        negative_filters = await negative_filters_service.get_negative_filters()  # БЕЗ group_id
-        print(f"🎯 Глобальных ограничений: {len(negative_filters)}")
-
-        # Очищаем текущее расписание для этой группы
-        await schedule_service.clear_schedule_for_group(group_id)
-
-        # Генерируем расписание
-        lessons = await schedule_generator.generate(subjects, negative_filters, group_id)
-
-        print(f"✅ Расписание для группы {group_id} сгенерировано успешно")
-        return {"message": f"Расписание для группы {group_id} сгенерировано", "lessons": len(lessons)}
-
+        return {
+            "message": f"Расписание для группы {group_id} сгенерировано",
+            "lessons": len(lessons)
+        }
     except Exception as e:
-        print(f"❌ Ошибка генерации расписания: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

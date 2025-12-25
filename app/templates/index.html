@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🎓 Генератор расписания</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/min.css">
+    <link rel="stylesheet" href="/static/css/font.woff2">
 </head>
 <body>
     <div class="app-container">
@@ -119,18 +120,34 @@
                                 <label>Часы:</label>
                                 <input type="number" name="hours" value="4" min="2" step="2" required>
                             </div>
-                            <div class="form-group">
-                                <label>Приоритет:</label>
-                                <input type="number" name="priority" value="0" min="0" max="10">
-                            </div>
-                            <div class="form-group">
-                                <label>Макс. в день:</label>
-                                <input type="number" name="max_per_day" value="2" min="1" max="4">
-                            </div>
-                            <button type="submit" class="btn-primary btn-small">
-                                <i class="fas fa-plus"></i> Добавить предмет
-                            </button>
-                        </form>
+<div class="form-group">
+        <label>Приоритет:</label>
+        <input type="number" name="priority" value="0" min="0" max="10">
+    </div>
+    <div class="form-group">
+        <label>Макс. пар в день:</label>
+        <input type="number" name="max_per_day" value="2" min="1" max="4">
+    </div>
+
+    <div class="form-group">
+        <label><i class="fas fa-calendar-week"></i> Недельные квоты:</label>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div>
+                <label style="font-size: 0.8rem;">Минимум пар в неделю:</label>
+                <input type="number" name="min_per_week" value="0" min="0" max="20" style="width: 100%;">
+                <small style="font-size: 0.7rem; color: var(--secondary);">0 = не обязательно</small>
+            </div>
+            <div>
+                <label style="font-size: 0.8rem;">Максимум пар в неделю:</label>
+                <input type="number" name="max_per_week" value="20" min="1" max="20" style="width: 100%;">
+            </div>
+        </div>
+    </div>
+
+    <button type="submit" class="btn-primary btn-small">
+        <i class="fas fa-plus"></i> Добавить предмет
+    </button>
+</form>
 
                         <div class="subjects-list compact-list" id="subjectsList">
                             <!-- Список предметов будет здесь -->

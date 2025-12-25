@@ -75,21 +75,53 @@ class GroupService:
         if group_id == 1:
             raise ValueError("Нельзя удалить основную группу")
 
-        # Удаляем все данные группы
-        tables = ['subjects', 'teachers', 'lessons', 'negative_filters']
-        for table in tables:
-            await database.execute(
-                f'DELETE FROM {table} WHERE group_id = ?',
+        try:
+            print(f"🗑️ Удаление группы {group_id} и всех её данных...")
+
+            # 1. Проверяем существование группы
+            group_exists = await database.fetch_one(
+                'SELECT id FROM study_groups WHERE id = ?',
+                (group_id,)
+            )
+            if not group_exists:
+                print(f"❌ Группа {group_id} не найдена")
+                return False
+
+            # 2. Удаляем данные группы из всех таблиц
+            tables_to_clean = [
+                'subjects',  # Предметы группы
+                'lessons',  # Расписание группы
+                'saved_schedules'  # Сохраненные расписания группы
+            ]
+
+            for table in tables_to_clean:
+                try:
+                    result = await database.execute(
+                        f'DELETE FROM {table} WHERE group_id = ?',
+                        (group_id,)
+                    )
+                    print(f"🧹 Удалено из {table}: {result.rowcount} записей")
+                except Exception as e:
+                    print(f"⚠️ Ошибка при очистке {table}: {e}")
+
+            # 3. Удаляем саму группу
+            result = await database.execute(
+                'DELETE FROM study_groups WHERE id = ?',
                 (group_id,)
             )
 
-        # Удаляем саму группу
-        result = await database.execute(
-            'DELETE FROM study_groups WHERE id = ?',
-            (group_id,)
-        )
+            if result.rowcount > 0:
+                print(f"✅ Группа {group_id} успешно удалена")
+                return True
+            else:
+                print(f"❌ Не удалось удалить группу {group_id}")
+                return False
 
-        return result.rowcount > 0
+        except Exception as e:
+            print(f"❌ Ошибка удаления группы {group_id}: {e}")
+            import traceback
+            print(f"❌ Traceback: {traceback.format_exc()}")
+            raise ValueError(f"Ошибка удаления группы: {str(e)}")
 
     async def group_exists(self, group_id: int) -> bool:
         """Проверить существование группы"""

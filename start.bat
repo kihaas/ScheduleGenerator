@@ -1,70 +1,50 @@
 @echo off
 chcp 65001 > nul
-title Schedule Generator - Development Mode
+title Schedule Generator
 
 echo ========================================
-echo       SCHEDULE GENERATOR
+echo       SCHEDULE GENERATOR v3.0
 echo ========================================
 echo.
-echo Starting in DEVELOPMENT mode...
-echo.
+
+cd /d "%~dp0"
 
 REM Проверяем Python
-python --version >nul 2>&1
+python --version >nul 2>nul
 if errorlevel 1 (
-    echo ERROR: Python not found!
-    echo Please run install.bat first
+    echo ❌ Python not found!
+    echo Install Python 3.8+ from python.org
+    echo Check "Add Python to PATH" during installation
     pause
     exit /b 1
 )
 
-REM Проверяем зависимости
-if not exist "requirements.txt" (
-    echo WARNING: requirements.txt not found!
-    echo Running installation...
+REM Проверяем виртуальное окружение
+if not exist "venv\Scripts\python.exe" (
+    echo ⚠️  Virtual environment not found!
+    echo Running install.bat...
     call install.bat
 )
 
-echo Checking dependencies...
-python -c "import fastapi, uvicorn, jinja2, sqlalchemy, aiosqlite, pydantic" >nul 2>&1
-if errorlevel 1 (
-    echo Some dependencies missing. Installing...
-    call install.bat
-)
+echo Activating virtual environment...
+call venv\Scripts\activate.bat
 
 echo.
-echo Starting server...
+echo 🚀 Starting Schedule Generator...
+echo.
+echo ⚠️  Keep this window open!
+echo.
+echo 🌐 Opening browser...
+start "" "http://127.0.0.1:8000"
+echo.
+echo ⏹️  Press Ctrl+C to stop
+echo ========================================
 echo.
 
-REM Запускаем сервер в новом окне с autoreload
-start "Schedule Generator Server" cmd /k "cd /d %~dp0 && python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload"
-
-echo Waiting 3 seconds for server to start...
-timeout /t 3 /nobreak > nul
-
-REM Проверяем запустился ли сервер
-REM Проверяем запустился ли сервер
-REM Проверяем запустился ли сервер
-powershell -Command "try { $response = Invoke-WebRequest -Uri 'http://127.0.0.1:8000/health' -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop; if ($response.StatusCode -eq 200) { exit 0 } } catch { exit 1 }"
-    echo Server started successfully!
-    echo.
-    echo Opening browser...
-    start "" "http://127.0.0.1:8000"
-
-    echo.
-    echo ========================================
-    echo     APPLICATION IS RUNNING!
-    echo ========================================
-    echo.
-    echo Server:  http://127.0.0.1:8000
-    echo Health:  http://127.0.0.1:8000/health
-    echo.
-    echo Press Ctrl+C in server window to stop
-) else (
-    echo ERROR: Server failed to start!
-    echo Check the server window for errors
-)
+REM Запускаем сервер
+cd app
+python main.py
 
 echo.
-echo Press any key to close this window...
-pause > nul
+echo Application closed.
+pause
